@@ -1,4 +1,17 @@
 =INDEX(B$2:D$100, MATCH(F2, A$2:A$100, 0), MATCH(2, 1/(INDEX(B$2:D$100, MATCH(F2, A$2:A$100, 0), )<>"" )))
+Breakdown:
+1.	MATCH(F2, A$2:A$100, 0)  
+This finds the row number in the range A2:A100 where the value equals the value in cell F2. The ‘0’ means it’s looking for an exact match.
+2.	INDEX(B$2:D$100, MATCH(F2, A$2:A$100, 0), …)  
+Uses the row number found above to select the corresponding row from the range B2:D100.
+3.	MATCH(2, 1/(INDEX(B$2:D$100, MATCH(F2, A$2:A$100, 0), )<>”” ))  
+This part finds the last non-empty column in the matched row:
+•	`INDEX(B$2:D$100, MATCH(F2, A$2:A$100, 0), )` returns the entire matched row as an array.
+•	`<>""` creates a TRUE/FALSE array where TRUE indicates non-empty cells.
+•	`1/(...)` converts TRUE to 1 and FALSE (empty) to an error (division by zero).
+•	`MATCH(2, …)` looks for the number 2 which isn’t found, so it returns the position of the last 1, effectively the last non-empty column in that row.
+What this formula does:
+It looks for the row matching the value in F2 in column A, then returns the value from the last non-empty cell in that row across columns B to D.
 
 
 import matplotlib.pyplot as plt
