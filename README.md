@@ -1,1 +1,2 @@
+=INDEX(B$2:D$100, MATCH(F2, A$2:A$100, 0), MATCH(2, 1/(INDEX(B$2:D$100, MATCH(F2, A$2:A$100, 0), )<>"" )))
 
