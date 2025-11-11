@@ -1,0 +1,8 @@
+Developed a comprehensive nowcasting model for South Africa’s real GDP growth, leveraging AR, ARMA, Indicator, and Pattern Sequencing Forecast (PSF) frameworks with step-ahead forecasting and out-of-sample evaluation.
+•	Enhanced the COMPASS FX model to incorporate the latest Current Account Balance (CAB) imbalances, long-run equilibrium exchange rates, and related metrics for publication readiness.
+•	Created an inflation heatmap for September 2025 covering Poland, the Czech Republic, and Hungary, identifying key drivers of core inflation across goods and services.
+•	Updated the FOMO-JOMO investment sentiment model for October 2025 to analyze buy-rated and underperforming stocks, along with trends in EEMEA fund flows.
+•	Conducted in-depth research on Lebanon’s economic performance, examining factors behind higher-than-expected GDP growth and the divergence between CPI inflation and the GDP deflator.
+•	Built an AI-based summary table ranking countries by key macroeconomic indicators to identify the most and least advantaged economies.
+•	Automated an Excel-based tool for retrieving real-time spot rates across multiple countries, streamlining data updates and analysis workflows.
+•	Estimated weekly and monthly correlations between USD/NGN and EMFX over the past 5 and 15 years, and visualized USD/NGN versus oil price dynamics using daily and monthly data over 5- and 10-year periods
