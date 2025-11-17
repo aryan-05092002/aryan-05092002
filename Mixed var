@@ -1,0 +1,149 @@
+import numpy as np
+import pandas as pd
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import statsmodels.api as sm
+
+# Define indicator columns based on your dataset (adjust as needed)
+indicators = [...]  # list your indicator column names here
+
+# Define factor and train parameters
+n_factors = 5
+initial_train_end = pd.Period('2020Q4', freq='Q')
+evaluation_end = pd.Period('2025Q2', freq='Q')
+
+forecasted = []
+actuals = []
+quarters = []
+
+current_train_end = initial_train_end
+
+while current_train_end < evaluation_end:
+    # Select training data up to current train end
+    train_data = qpc_data1.loc[:current_train_end]  
+    train_data = train_data.dropna(subset=['REAL_GDP_QPC'] + indicators)
+
+    # Standardize indicators
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(train_data[indicators])
+    
+    # Extract factors using PCA
+    pca = PCA(n_components=n_factors)
+    factors_train = pca.fit_transform(X_train_scaled)
+    factors_df = pd.DataFrame(factors_train, index=train_data.index, 
+                              columns=[f'Factor{i+1}' for i in range(n_factors)])
+
+    # Combine factors with GDP series
+    combined_df = pd.concat([train_data['REAL_GDP_QPC'], factors_df], axis=1).dropna()
+
+    # Fit regression of GDP on factors
+    X = sm.add_constant(combined_df[[f'Factor{i+1}' for i in range(n_factors)]])
+    y = combined_df['REAL_GDP_QPC']
+    model = sm.OLS(y, X).fit()
+
+    # Forecast for next period
+    next_period = current_train_end + 1
+    if next_period not in qpc_data1.index:
+        break
+    
+    # Prepare next period factors by transforming indicators for next period using fitted scaler and PCA
+    try:
+        next_indicators = qpc_data1.loc[next_period, indicators]
+    except KeyError:
+        break
+    
+    if next_indicators.isnull().any():
+        current_train_end += 1
+        continue
+
+    next_indicators_scaled = scaler.transform(next_indicators.values.reshape(1, -1))
+    next_factors = pca.transform(next_indicators_scaled)
+    X_next = sm.add_constant(pd.DataFrame(next_factors, columns=[f'Factor{i+1}' for i in range(n_factors)]))
+
+    forecast = model.predict(X_next)[0]
+
+    # Store results
+    forecasted.append(forecast)
+    actuals.append(qpc_data1.loc[next_period, 'REAL_GDP_QPC'])
+    quarters.append(next_period)
+
+    current_train_end += 1
+
+# Output results
+results_df = pd.DataFrame({'Quarter': quarters, 'Forecast': forecasted, 'Actual': actuals}).set_index('Quarter')
+print(results_df)
+
+# Assume your DataFrame is qpc_data1 and the quarterly GDP column is 'REAL_GDP_QPC'
+
+# Calculate Year-on-Year percent change
+qpc_data1['REAL_GDP_QPC_YOY'] = qpc_data1['REAL_GDP_QPC'].pct_change(periods=4) * 100
+
+# This will give the YoY percentage change for each quarter compared to the same quarter in the previous year.
+
+
+import pandas as pd
+import numpy as np
+from statsmodels.tsa.api import VAR
+
+# Example: Suppose you have
+# - 'REAL_GDP_QPC' at quarterly frequency (target)
+# - some indicators at monthly frequency (e.g., 'Retail', 'Vehicle', ...)
+
+# Convert/aggregate monthly indicators to quarterly (mean/sum/last as appropriate)
+def monthly_to_quarterly(df_monthly):
+    return df_monthly.resample('Q').mean()     # or .sum() depending on indicator
+
+# Example: aggregate all monthly indicators to quarterly
+quarterly_indicators = pd.DataFrame(index=qpc_data1.index)
+for ind in monthly_indicators.columns:  # monthly_indicators: DataFrame indexed by Monthly PeriodIndex
+    quarterly_indicators[ind] = monthly_to_quarterly(monthly_indicators[ind])
+
+# Combine with quarterly GDP (aligning index)
+full_quarterly_data = pd.concat([qpc_data1['REAL_GDP_QPC'], quarterly_indicators], axis=1)
+
+# Parameters for rolling window
+initial_train_end = pd.Period('2020Q4', freq='Q')
+evaluation_end = pd.Period('2025Q2', freq='Q')
+current_train_end = initial_train_end
+
+forecasted = []
+actuals = []
+quarters = []
+
+lag_order = 3  # as in the paper (lag length in months; here, quarterly data so adjust accordingly)
+
+while current_train_end < evaluation_end:
+    train_data = full_quarterly_data.loc[:current_train_end].dropna()
+
+    # Estimate VAR with chosen variables and lags (adjust variable names as in paper)
+    if len(train_data) <= lag_order:
+        current_train_end += 1
+        continue
+
+    model = VAR(train_data)
+    fitted_model = model.fit(maxlags=lag_order)
+
+    # Forecast next period (1 step ahead)
+    forecast_input = train_data.values[-lag_order:]
+    next_quarter = current_train_end + 1
+
+    # Only forecast if next_quarter exists and the actual value is available
+    if next_quarter not in full_quarterly_data.index:
+        break
+    if np.isnan(full_quarterly_data.loc[next_quarter, 'REAL_GDP_QPC']):
+        current_train_end += 1
+        continue
+
+    forecast = fitted_model.forecast(y=forecast_input, steps=1)[0][0]  # GDP is assumed as first column
+    forecasted.append(forecast)
+    actuals.append(full_quarterly_data.loc[next_quarter, 'REAL_GDP_QPC'])
+    quarters.append(next_quarter)
+    current_train_end += 1
+
+# Make DataFrame of results
+results_df = pd.DataFrame({'Quarter': quarters, 'Forecast': forecasted, 'Actual': actuals}).set_index('Quarter')
+print(results_df)
+
+
+
+
