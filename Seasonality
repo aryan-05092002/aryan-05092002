@@ -1,0 +1,36 @@
+To remove seasonality in your year-on-year (YoY) % change GDP series (or any quarterly series), you can use the following approaches:
+
+1. **Differencing at seasonal lag (Seasonal Differencing):**  
+   Difference the series at lag 4 (for quarterly data) to remove seasonal patterns. This means subtracting the value from the same quarter last year.
+
+   Python example:
+   ```python
+   # Seasonal difference at lag 4
+   qpc_data1['REAL_GDP_QPC_YOY_Seasonally_Diff'] = qpc_data1['REAL_GDP_QPC_YOY'] - qpc_data1['REAL_GDP_QPC_YOY'].shift(4)
+   ```
+
+2. **Seasonal Decomposition (STL, classical) and remove seasonal component:**  
+   - Use `statsmodels.tsa.seasonal.seasonal_decompose` or STL to decompose the series into trend, seasonal, and residual components.
+   - Subtract the seasonal component to get deseasonalized data.
+
+   Example:
+   ```python
+   from statsmodels.tsa.seasonal import seasonal_decompose
+
+   decomposition = seasonal_decompose(qpc_data1['REAL_GDP_QPC_YOY'].dropna(), model='additive', period=4)
+   qpc_data1['Deseasonalized'] = qpc_data1['REAL_GDP_QPC_YOY'] - decomposition.seasonal
+   ```
+
+3. **Seasonal Adjustment Using Statistical Packages:**  
+   Use packages like `statsmodels`’ `x13_arima_analysis` or `R`-packages for more advanced seasonal adjustment.
+
+***
+
+**Summary:**  
+- Seasonal differencing (lag 4 for quarterly) is a simple way to remove seasonality.  
+- Series decomposition lets you explicitly remove seasonal component.  
+- Choose based on analysis context and whether residual seasonality persists.
+
+If you want, I can provide code examples to apply these or guide you through selecting the best for your data!
+
+Sources
