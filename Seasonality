@@ -89,3 +89,128 @@ Sources
 [8] What is an autoregressive model | IBM https://www.ibm.com/think/topics/autoregressive-model
 [9] Which Lag Length Selection Criteria Should We Employ? https://ideas.repec.org/a/ebl/ecbull/eb-04c20021.html
 
+
+
+
+
+Here is Python code for all the concepts you asked about:
+
+***
+
+### 1. Plotting ACF and PACF for a time series
+
+```python
+import matplotlib.pyplot as plt
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+
+series = qpc_data1['REAL_GDP_QPC_YOY'].dropna()
+
+fig, ax = plt.subplots(2,1, figsize=(10,8))
+plot_acf(series, ax=ax[0], lags=20)
+plot_pacf(series, ax=ax[1], lags=20)
+plt.show()
+```
+
+***
+
+### 2. Interpreting ACF under band after lag 2 and PACF with jumps at lag 1, 4, 5
+
+- ACF cutoff after lag 2 → Few autocorrelations beyond lag 2 → suggest MA(2) or low MA order
+- PACF jumps at lag 1, 4, 5 → direct AR effects at those lags → suggest AR(1) and possible seasonal AR terms at lags 4 and 5
+
+***
+
+### 3. Detecting seasonality in YoY % change
+
+- Seasonality shows as recurring patterns every 4 quarters in YoY GDP
+- Check ACF for spikes at multiples of 4 lags or decompose series
+- Use seasonal decomposition:
+
+```python
+from statsmodels.tsa.seasonal import seasonal_decompose
+
+decomposition = seasonal_decompose(series, model='additive', period=4)
+decomposition.plot()
+plt.show()
+```
+
+***
+
+### 4. Removing seasonality (deseasonalizing YoY % change)
+
+Using seasonal differencing or decomposition:
+
+```python
+# Seasonal differencing at lag 4
+qpc_data1['YOY_Deseasonalized'] = series - series.shift(4)
+
+# Or remove seasonal component from decomposition
+qpc_data1['YOY_Deseasonalized2'] = series - decomposition.seasonal
+```
+
+***
+
+### 5. Selecting number of lags for AR model
+
+Using AIC for lag selection:
+
+```python
+from statsmodels.tsa.ar_model import AutoReg
+import numpy as np
+
+best_aic = np.inf
+best_lag = 0
+for lag in range(1, 11):
+    model = AutoReg(series, lags=lag).fit()
+    if model.aic < best_aic:
+        best_aic = model.aic
+        best_lag = lag
+
+print(f"Optimal lag length by AIC: {best_lag}")
+```
+
+***
+
+These codes and interpretations should help you understand and implement your time series models effectively. Let me know if you want detailed explanation or walkthrough for any step!
+
+Sources
+
+
+
+
+
+
+
+import pandas as pd
+import numpy as np
+from statsmodels.tsa.arima.model import ARIMA
+
+series = qpc_data1['REAL_GDP_QPC_YOY'].dropna()
+
+best_aic = np.inf
+best_order = None
+best_model = None
+
+# Search over p,d,q values (e.g. p,q = 0 to 3; d=0 or 1)
+for p in range(4):
+    for d in range(2):
+        for q in range(4):
+            try:
+                model = ARIMA(series, order=(p,d,q))
+                fitted = model.fit()
+                if fitted.aic < best_aic:
+                    best_aic = fitted.aic
+                    best_order = (p,d,q)
+                    best_model = fitted
+            except Exception:
+                continue
+
+print(f"Best ARIMA order: {best_order} with AIC {best_aic}")
+print(best_model.summary())
+
+
+
+
+
+
+
