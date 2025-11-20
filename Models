@@ -1,0 +1,337 @@
+import pandas as pd
+import statsmodels.api as sm
+
+# Assuming your series is stored in 'series'
+series = qpc_data1['REAL_GDP_QPC']
+
+# Create lag features for AR(10)
+for lag in range(1, 11):
+    qpc_data1[f'gdp_lag_{lag}'] = series.shift(lag)
+
+# Initialize lists to store forecast and actual data
+forecasted = []
+actuals = []
+quarters = []
+
+initial_train_end = pd.Period('2020Q4', freq='Q')  # starting point
+evaluation_end = pd.Period('2025Q2', freq='Q')   # ending point
+
+current_train_end = initial_train_end
+
+while current_train_end < evaluation_end:
+    # Prepare the training data
+    train_data = qpc_data1.loc[:current_train_end].dropna(subset=[f'gdp_lag_{lag}' for lag in range(1, 11)] + ['REAL_GDP_QPC'])
+    y_train = train_data['REAL_GDP_QPC']
+    X_train = train_data[[f'gdp_lag_{lag}' for lag in range(1, 11)]]
+    X_train = sm.add_constant(X_train)
+
+    # Fit the model
+    model = sm.OLS(y_train, X_train).fit()
+
+    # Prepare test data
+    test_period = current_train_end + 1
+    if test_period not in qpc_data1.index:
+        break
+    test_row = qpc_data1.loc[test_period]
+    # Collect lag values for test
+    test_lags = {}
+    missing = False
+    for lag in range(1, 11):
+        lag_period = test_period - lag
+        if lag_period in qpc_data1.index:
+            test_lags[f'gdp_lag_{lag}'] = qpc_data1.loc[lag_period, 'REAL_GDP_QPC']
+        else:
+            missing = True
+            break
+    if missing:
+        current_train_end += 1
+        continue
+
+    X_test = pd.DataFrame([test_lags])
+    X_test = sm.add_constant(X_test)
+
+    # Ensure the test input has the same columns
+    if X_test.shape[1] != X_train.shape[1]:
+        current_train_end += 1
+        continue
+
+    # Make forecast
+    forecast = model.predict(X_test)[0]
+
+    # Store results
+    forecasted.append(forecast)
+    actuals.append(test_row['REAL_GDP_QPC'])
+    quarters.append(test_period)
+
+    current_train_end += 1
+
+# Results
+results_df = pd.DataFrame({'Quarter': quarters, 'Forecast': forecasted, 'Actual': actuals}).set_index('Quarter')
+print(results_df)
+
+
+
+
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+
+# Assume your quarterly data with GDP and other variables is in 'data'
+# Replace 'GDP' with your GDP column name as appropriate
+# The data index should be quarterly PeriodIndex
+
+# Step 1: Find optimal lag length based on BIC
+max_lag = 10
+best_bic = np.inf
+best_lag = 1
+
+for lag in range(1, max_lag + 1):
+    try:
+        model = sm.tsa.VAR(data)
+        result = model.fit(lag)
+        if result.bic < best_bic:
+            best_bic = result.bic
+            best_lag = lag
+    except Exception:
+        continue
+
+print(f"Optimal lag length selected: {best_lag}")
+
+# Step 2: Rolling window forecasting using the optimal lag length
+forecast_steps = 1  # 1-step ahead forecast each iteration
+
+forecasted = []
+actuals = []
+quarters = []
+
+initial_train_end = pd.Period('2020Q4', freq='Q')
+evaluation_end = pd.Period('2025Q2', freq='Q')
+
+current_train_end = initial_train_end
+
+while current_train_end < evaluation_end:
+    train_data = data.loc[:current_train_end].dropna()
+
+    if len(train_data) <= best_lag:
+        current_train_end += 1
+        continue
+
+    model = sm.tsa.VAR(train_data)
+    results = model.fit(best_lag)
+
+    # Prepare last lag observations for forecasting
+    lagged_values = train_data.values[-best_lag:]
+    forecast = results.forecast(y=lagged_values, steps=forecast_steps)
+
+    forecast_period = current_train_end + 1
+    if forecast_period not in data.index:
+        break
+
+    forecasted.append(forecast[0][data.columns.get_loc('GDP')])  # predicted GDP value
+    actuals.append(data.loc[forecast_period, 'GDP'])
+    quarters.append(forecast_period)
+
+    current_train_end = forecast_period
+
+# Output DataFrame with forecasts and actual values
+results_df = pd.DataFrame({
+    'Quarter': quarters,
+    'Forecast': forecasted,
+    'Actual': actuals
+}).set_index('Quarter')
+
+print(results_df)
+
+
+
+
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+from statsmodels.tsa.api import VAR
+from sklearn.linear_model import Ridge
+
+# Data variables list - replace with your actual columns
+variables = ['REAL_GDP_QPC_YOY', 'var1', 'var2', 'var3']  # Ensure GDP is first
+
+series = qpc_data1['REAL_GDP_QPC_YOY']
+max_lag_ar = 10
+max_lag_var = 4  # can optimize similar to previous code
+
+forecasted = []
+actuals = []
+quarters = []
+
+initial_train_end = pd.Period('2020Q4', freq='Q')
+evaluation_end = pd.Period('2025Q2', freq='Q')
+current_train_end = initial_train_end
+
+while current_train_end < evaluation_end:
+    train_data = qpc_data1.loc[:current_train_end, variables].dropna()
+
+    if len(train_data) <= max_lag_ar:
+        current_train_end += 1
+        continue
+
+    # AR(10) model
+    ar_train = train_data[['REAL_GDP_QPC_YOY']].copy()
+    for lag in range(1, max_lag_ar + 1):
+        ar_train[f'lag_{lag}'] = ar_train['REAL_GDP_QPC_YOY'].shift(lag)
+    ar_train.dropna(inplace=True)
+    X_ar = ar_train[[f'lag_{lag}' for lag in range(1, max_lag_ar + 1)]]
+    y_ar = ar_train['REAL_GDP_QPC_YOY']
+    X_ar_const = sm.add_constant(X_ar)
+    ar_model = sm.OLS(y_ar, X_ar_const).fit()
+
+    test_period = current_train_end + 1
+    if test_period not in qpc_data1.index:
+        break
+
+    # Test features for AR
+    missing_ar = False
+    test_features_ar = {}
+    for lag in range(1, max_lag_ar + 1):
+        lag_period = test_period - lag
+        if lag_period in qpc_data1.index and not pd.isna(qpc_data1.loc[lag_period, 'REAL_GDP_QPC_YOY']):
+            test_features_ar[f'lag_{lag}'] = qpc_data1.loc[lag_period, 'REAL_GDP_QPC_YOY']
+        else:
+            missing_ar = True
+            break
+    if missing_ar:
+        current_train_end += 1
+        continue
+    X_test_ar = pd.DataFrame([test_features_ar])
+    X_test_ar = sm.add_constant(X_test_ar)
+    forecast_ar = ar_model.predict(X_test_ar)[0]
+
+    # VAR model
+    try:
+        var_model = VAR(train_data)
+        var_results = var_model.fit(maxlags=max_lag_var)
+    except:
+        current_train_end += 1
+        continue
+
+    last_vals = train_data.values[-var_results.k_ar:]
+    forecast_var = var_results.forecast(y=last_vals, steps=1)[0][0]
+
+    # Ridge regression on other vars
+    ridge_train = train_data.dropna()
+    X_ridge = ridge_train[variables[1:]]  # predictors excluding GDP
+    y_ridge = ridge_train['REAL_GDP_QPC_YOY']
+    ridge_model = Ridge()
+    ridge_model.fit(X_ridge, y_ridge)
+
+    if test_period not in qpc_data1.index or qpc_data1.loc[test_period, variables[1:]].isna().any():
+        current_train_end += 1
+        continue
+
+    X_test_ridge = qpc_data1.loc[test_period, variables[1:]].values.reshape(1, -1)
+    forecast_ridge = ridge_model.predict(X_test_ridge)[0]
+
+    # Combine forecasts by equal weights
+    combined_forecast = np.mean([forecast_ar, forecast_var, forecast_ridge])
+
+    actual = qpc_data1.loc[test_period, 'REAL_GDP_QPC_YOY']
+
+    forecasted.append(combined_forecast)
+    actuals.append(actual)
+    quarters.append(test_period)
+
+    current_train_end += 1
+
+# Compile results into DataFrame for analysis
+results_df = pd.DataFrame({
+    'Quarter': quarters,
+    'Combined_Forecast': forecasted,
+    'Actual': actuals
+}).set_index('Quarter')
+
+print(results_df)
+
+
+
+
+
+import pandas as pd
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import statsmodels.api as sm
+
+# Parameters
+n_factors = 5
+initial_train_end = pd.Period('2020Q4', freq='Q')
+evaluation_end = pd.Period('2025Q2', freq='Q')
+
+# Your dataset: qpc_data1 with quarterly YoY indicators including 'REAL_GDP_QPC_YOY'
+indicators = [col for col in qpc_data1.columns if col != 'REAL_GDP_QPC_YOY']
+
+forecasted = []
+actuals = []
+quarters = []
+
+current_train_end = initial_train_end
+
+while current_train_end < evaluation_end:
+    # Select training data up to current train end
+    train_data = qpc_data1.loc[:current_train_end].dropna(subset=['REAL_GDP_QPC_YOY'] + indicators)
+
+    # Standardize indicators for PCA
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(train_data[indicators])
+
+    # Extract factors with PCA
+    pca = PCA(n_components=n_factors)
+    factors_train = pca.fit_transform(X_train_scaled)
+
+    factors_df = pd.DataFrame(factors_train, index=train_data.index, columns=[f'Factor_{i+1}' for i in range(n_factors)])
+
+    # Combine factors with GDP YoY
+    combined_df = pd.concat([train_data['REAL_GDP_QPC_YOY'], factors_df], axis=1).dropna()
+
+    # Regression of GDP on factors
+    X = sm.add_constant(combined_df[[f'Factor_{i+1}' for i in range(n_factors)]])
+    y = combined_df['REAL_GDP_QPC_YOY']
+    model = sm.OLS(y, X).fit()
+
+    # Forecast next period
+    next_period = current_train_end + 1
+    if next_period not in qpc_data1.index:
+        break
+
+    # Prepare factors for next period by transforming standardized indicators
+    next_indicators = qpc_data1.loc[next_period, indicators]
+
+    # Skip if missing indicators
+    if next_indicators.isnull().any():
+        current_train_end += 1
+        continue
+
+    next_ind_scaled = scaler.transform(next_indicators.values.reshape(1, -1))
+    next_factors = pca.transform(next_ind_scaled)
+    X_next = sm.add_constant(pd.DataFrame(next_factors, columns=[f'Factor_{i+1}' for i in range(n_factors)]))
+
+    forecast = model.predict(X_next)[0]
+
+    forecasted.append(forecast)
+    actuals.append(qpc_data1.loc[next_period, 'REAL_GDP_QPC_YOY'])
+    quarters.append(next_period)
+
+    current_train_end += 1
+
+# Output results
+results_df = pd.DataFrame({'Quarter': quarters, 'Forecast': forecasted, 'Actual': actuals}).set_index('Quarter')
+print(results_df)
+
+
+
+
+
+
+
+
+
+
+
+
+
