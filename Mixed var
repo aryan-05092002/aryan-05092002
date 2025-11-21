@@ -58,9 +58,14 @@ while current_train_end < evaluation_end:
 
     next_indicators_scaled = scaler.transform(next_indicators.values.reshape(1, -1))
     next_factors = pca.transform(next_indicators_scaled)
-    X_next = sm.add_constant(pd.DataFrame(next_factors, columns=[f'Factor{i+1}' for i in range(n_factors)]))
+X_next = pd.DataFrame(next_factors, columns=[f'Factor{i+1}' for i in range(n_factors)])
+X_next = sm.add_constant(X_next, has_constant='add')
 
-    forecast = model.predict(X_next)[0]
+# Ensure correct column order for prediction
+X_next = X_next[X.columns]
+
+forecast = model.predict(X_next)[0]
+
 
     # Store results
     forecasted.append(forecast)
