@@ -62,3 +62,27 @@ results_df = pd.DataFrame({'Quarter': quarters,
                            'Forecast_ML_Lasso': forecasted,
                            'Actual': actuals}).set_index('Quarter')
 print(results_df)
+
+
+import numpy as np
+
+n_bootstrap = 100
+forecasts_boot = []
+
+for i in range(n_bootstrap):
+    # Resample training data (X_train, y_train)
+    idx = np.random.choice(len(X_train_scaled), size=len(X_train_scaled), replace=True)
+    X_resampled = X_train_scaled[idx]
+    y_resampled = y_train.iloc[idx]
+
+    # Fit Lasso on resampled data
+    model_boot = LassoCV(cv=5, random_state=42).fit(X_resampled, y_resampled)
+
+    # Forecast with model_boot
+    forecast_boot_i = model_boot.predict(X_test_scaled)[0]
+    forecasts_boot.append(forecast_boot_i)
+
+# Calculate confidence intervals (e.g., 5th and 95th percentiles)
+lower_bound = np.percentile(forecasts_boot, 5)
+upper_bound = np.percentile(forecasts_boot, 95)
+
