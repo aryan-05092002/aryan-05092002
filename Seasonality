@@ -1,216 +1,64 @@
-To remove seasonality in your year-on-year (YoY) % change GDP series (or any quarterly series), you can use the following approaches:
-
-1. **Differencing at seasonal lag (Seasonal Differencing):**  
-   Difference the series at lag 4 (for quarterly data) to remove seasonal patterns. This means subtracting the value from the same quarter last year.
-
-   Python example:
-   ```python
-   # Seasonal difference at lag 4
-   qpc_data1['REAL_GDP_QPC_YOY_Seasonally_Diff'] = qpc_data1['REAL_GDP_QPC_YOY'] - qpc_data1['REAL_GDP_QPC_YOY'].shift(4)
-   ```
-
-2. **Seasonal Decomposition (STL, classical) and remove seasonal component:**  
-   - Use `statsmodels.tsa.seasonal.seasonal_decompose` or STL to decompose the series into trend, seasonal, and residual components.
-   - Subtract the seasonal component to get deseasonalized data.
-
-   Example:
-   ```python
-   from statsmodels.tsa.seasonal import seasonal_decompose
-
-   decomposition = seasonal_decompose(qpc_data1['REAL_GDP_QPC_YOY'].dropna(), model='additive', period=4)
-   qpc_data1['Deseasonalized'] = qpc_data1['REAL_GDP_QPC_YOY'] - decomposition.seasonal
-   ```
-
-3. **Seasonal Adjustment Using Statistical Packages:**  
-   Use packages like `statsmodels`’ `x13_arima_analysis` or `R`-packages for more advanced seasonal adjustment.
-
-***
-
-**Summary:**  
-- Seasonal differencing (lag 4 for quarterly) is a simple way to remove seasonality.  
-- Series decomposition lets you explicitly remove seasonal component.  
-- Choose based on analysis context and whether residual seasonality persists.
-
-If you want, I can provide code examples to apply these or guide you through selecting the best for your data!
-
-Sources
-
-
-
-
-
-To decide how many lags to include in an autoregressive (AR) model, you can use a combination of these methods:
-
-1. **Information Criteria:**
-   - Calculate the Akaike Information Criterion (AIC), Bayesian Information Criterion (BIC), or Hannan-Quinn Criterion (HQC) for AR models with varying lag lengths.
-   - Select the lag length that minimizes these criteria, balancing model fit and complexity. BIC tends to be more conservative (selects smaller models), AIC less so.
-   
-2. **Partial Autocorrelation Function (PACF):**
-   - Examine the PACF plot of your time series.
-   - The lag after which PACF values drop to (or near) zero suggests the AR order (p).
-   
-3. **Likelihood Ratio Tests:**
-   - Compare nested models with increasing lag lengths using likelihood ratio tests to see if additional lags significantly improve the model.
-
-4. **Cross-validation or Out-of-sample Forecasting:**
-   - Test model performance using rolling validation or holdout samples to pick the lag length yielding the best predictive accuracy.
-
-In practice, a common approach is to fit AR models for a range of lags (e.g., 1 to 10), compute AIC or BIC, and select the lag corresponding to the lowest criterion value.
-
-For example, in Python using `statsmodels`:
-
-```python
-from statsmodels.tsa.ar_model import AutoReg
-
-# Fit models with different lag lengths and choose the best according to AIC
-best_aic = np.inf
-best_lag = 0
-for lag in range(1, 11):
-    model = AutoReg(series, lags=lag).fit()
-    if model.aic < best_aic:
-        best_aic = model.aic
-        best_lag = lag
-
-print(f"Optimal lag length by AIC: {best_lag}")
-```
-
-This approach aligns with best practices cited in the literature on lag selection.
-
-In summary, use AIC/BIC criteria, PACF plots, and forecasting performance to determine how many lags to include in your AR model.
-
-Sources
-[1] 14.6 Lag Length Selection using Information Criteria https://www.econometrics-with-r.org/14.6-llsuic.html
-[2] [PDF] Lag Length Selection in Vector Autoregressive Models: Symmetric ... https://www.lsu.edu/business/economics/files/workingpapers/pap97_27.pdf
-[3] Autoregressive (AR) Model for Time Series Forecasting https://www.geeksforgeeks.org/data-analysis/autoregressive-ar-model-for-time-series-forecasting/
-[4] Autoregressive model - Wikipedia https://en.wikipedia.org/wiki/Autoregressive_model
-[5] Optimal Lag Selection for AR Models | Akaike Information Criterion https://es.scribd.com/document/790580403/Which-Lag-Selection-Criteria-Should-We-Employ
-[6] How to Select the Lag Order for an Autoregressive Model - LinkedIn https://www.linkedin.com/advice/1/how-do-you-select-appropriate-lag-order-autoregressive-rgl6c
-[7] How do you identify the optimal lag for a time series model? - Milvus https://milvus.io/ai-quick-reference/how-do-you-identify-the-optimal-lag-for-a-time-series-model
-[8] What is an autoregressive model | IBM https://www.ibm.com/think/topics/autoregressive-model
-[9] Which Lag Length Selection Criteria Should We Employ? https://ideas.repec.org/a/ebl/ecbull/eb-04c20021.html
-
-
-
-
-
-Here is Python code for all the concepts you asked about:
-
-***
-
-### 1. Plotting ACF and PACF for a time series
-
-```python
-import matplotlib.pyplot as plt
-from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
-
-series = qpc_data1['REAL_GDP_QPC_YOY'].dropna()
-
-fig, ax = plt.subplots(2,1, figsize=(10,8))
-plot_acf(series, ax=ax[0], lags=20)
-plot_pacf(series, ax=ax[1], lags=20)
-plt.show()
-```
-
-***
-
-### 2. Interpreting ACF under band after lag 2 and PACF with jumps at lag 1, 4, 5
-
-- ACF cutoff after lag 2 → Few autocorrelations beyond lag 2 → suggest MA(2) or low MA order
-- PACF jumps at lag 1, 4, 5 → direct AR effects at those lags → suggest AR(1) and possible seasonal AR terms at lags 4 and 5
-
-***
-
-### 3. Detecting seasonality in YoY % change
-
-- Seasonality shows as recurring patterns every 4 quarters in YoY GDP
-- Check ACF for spikes at multiples of 4 lags or decompose series
-- Use seasonal decomposition:
-
-```python
-from statsmodels.tsa.seasonal import seasonal_decompose
-
-decomposition = seasonal_decompose(series, model='additive', period=4)
-decomposition.plot()
-plt.show()
-```
-
-***
-
-### 4. Removing seasonality (deseasonalizing YoY % change)
-
-Using seasonal differencing or decomposition:
-
-```python
-# Seasonal differencing at lag 4
-qpc_data1['YOY_Deseasonalized'] = series - series.shift(4)
-
-# Or remove seasonal component from decomposition
-qpc_data1['YOY_Deseasonalized2'] = series - decomposition.seasonal
-```
-
-***
-
-### 5. Selecting number of lags for AR model
-
-Using AIC for lag selection:
-
-```python
-from statsmodels.tsa.ar_model import AutoReg
-import numpy as np
-
-best_aic = np.inf
-best_lag = 0
-for lag in range(1, 11):
-    model = AutoReg(series, lags=lag).fit()
-    if model.aic < best_aic:
-        best_aic = model.aic
-        best_lag = lag
-
-print(f"Optimal lag length by AIC: {best_lag}")
-```
-
-***
-
-These codes and interpretations should help you understand and implement your time series models effectively. Let me know if you want detailed explanation or walkthrough for any step!
-
-Sources
-
-
-
-
-
-
-
 import pandas as pd
 import numpy as np
-from statsmodels.tsa.arima.model import ARIMA
+from sklearn.linear_model import LassoCV
+from sklearn.preprocessing import StandardScaler
 
-series = qpc_data1['REAL_GDP_QPC_YOY'].dropna()
+# Variables
+variables = ['REAL_GDP_QPC_YOY', 'var1', 'var2', 'var3']  # Replace with your variable list
+indicators = variables[1:]  # all except GDP for predictors
 
-best_aic = np.inf
-best_order = None
-best_model = None
+initial_train_end = pd.Period('2020Q4', freq='Q')
+evaluation_end = pd.Period('2025Q2', freq='Q')
+current_train_end = initial_train_end
 
-# Search over p,d,q values (e.g. p,q = 0 to 3; d=0 or 1)
-for p in range(4):
-    for d in range(2):
-        for q in range(4):
-            try:
-                model = ARIMA(series, order=(p,d,q))
-                fitted = model.fit()
-                if fitted.aic < best_aic:
-                    best_aic = fitted.aic
-                    best_order = (p,d,q)
-                    best_model = fitted
-            except Exception:
-                continue
+forecasted = []
+actuals = []
+quarters = []
 
-print(f"Best ARIMA order: {best_order} with AIC {best_aic}")
-print(best_model.summary())
+while current_train_end < evaluation_end:
+    train_data = qpc_data1.loc[:current_train_end, variables].dropna()
+    if len(train_data) < 10:  # Require enough data points
+        current_train_end += 1
+        continue
 
+    # Define predictors and response
+    X_train = train_data[indicators]
+    y_train = train_data['REAL_GDP_QPC_YOY']
 
+    # Standardize predictors
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
 
+    # Fit LassoCV model (internally performs CV to select alpha)
+    lasso = LassoCV(cv=5, random_state=42).fit(X_train_scaled, y_train)
 
+    # Prepare test predictors for next period
+    next_period = current_train_end + 1
+    if next_period not in qpc_data1.index:
+        break
 
+    try:
+        X_test_raw = qpc_data1.loc[next_period, indicators]
+    except KeyError:
+        break
 
+    if X_test_raw.isnull().any():
+        current_train_end += 1
+        continue
 
+    X_test_scaled = scaler.transform(X_test_raw.values.reshape(1, -1))
+    forecast = lasso.predict(X_test_scaled)[0]
+
+    actual = qpc_data1.loc[next_period, 'REAL_GDP_QPC_YOY']
+
+    forecasted.append(forecast)
+    actuals.append(actual)
+    quarters.append(next_period)
+
+    current_train_end += 1
+
+# Output results
+results_df = pd.DataFrame({'Quarter': quarters,
+                           'Forecast_ML_Lasso': forecasted,
+                           'Actual': actuals}).set_index('Quarter')
+print(results_df)
