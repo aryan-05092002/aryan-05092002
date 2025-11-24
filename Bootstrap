@@ -1,0 +1,453 @@
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+from statsmodels.tsa.api import VAR
+
+lag_order = 2
+n_bootstrap = 100
+confidence_level = 90
+
+forecasted = []
+actuals = []
+quarters = []
+lower_bounds = []
+upper_bounds = []
+
+initial_train_end = pd.Period('2020Q4', freq='Q')
+evaluation_end = pd.Period('2025Q2', freq='Q')
+current_train_end = initial_train_end
+
+while current_train_end < evaluation_end:
+    train_data = data.loc[data.index <= current_train_end].dropna()
+    if len(train_data) <= lag_order:
+        current_train_end += 1
+        continue
+
+    # Fit VAR(2)
+    model = VAR(train_data)
+    results = model.fit(lag_order)
+
+    last_vals = train_data.values[-lag_order:]
+    forecast = results.forecast(y=last_vals, steps=1)[0]
+
+    forecast_period = current_train_end + 1
+    if forecast_period not in data.index:
+        break
+
+    # Bootstrap forecasts
+    forecasts_boot = []
+    n_obs = len(train_data)
+    for _ in range(n_bootstrap):
+        idx = np.random.choice(range(n_obs), size=n_obs, replace=True)
+        boot_data = train_data.iloc[idx].copy()
+        try:
+            model_boot = VAR(boot_data)
+            results_boot = model_boot.fit(lag_order)
+            last_vals_boot = boot_data.values[-lag_order:]
+            f_boot = results_boot.forecast(y=last_vals_boot, steps=1)[0]
+            forecasts_boot.append(f_boot)
+        except Exception:
+            continue
+
+    forecasts_boot = np.array(forecasts_boot)
+    # Extract GDP column index (assuming first column is GDP)
+    gdp_col_index = 0
+
+    gdp_forecasts = forecasts_boot[:, gdp_col_index]
+
+    lb = np.percentile(gdp_forecasts, (100 - confidence_level) / 2)
+    ub = np.percentile(gdp_forecasts, 100 - (100 - confidence_level) / 2)
+
+    forecasted.append(forecast[gdp_col_index])
+    actuals.append(data.loc[forecast_period, data.columns[gdp_col_index]])
+    quarters.append(forecast_period)
+    lower_bounds.append(lb)
+    upper_bounds.append(ub)
+
+    current_train_end = forecast_period
+
+results_var = pd.DataFrame({
+    'Quarter': quarters,
+    'Forecast_VAR': forecasted,
+    'Actual': actuals,
+    'CI_Lower_VAR': lower_bounds,
+    'CI_Upper_VAR': upper_bounds
+}).set_index('Quarter')
+
+print(results_var)
+
+
+
+import pandas as pd
+import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import statsmodels.api as sm
+
+n_factors = 5
+n_bootstrap = 100
+confidence_level = 90
+
+forecasted = []
+actuals = []
+quarters = []
+lower_bounds = []
+upper_bounds = []
+
+initial_train_end = pd.Period('2020Q4', freq='Q')
+evaluation_end = pd.Period('2025Q2', freq='Q')
+current_train_end = initial_train_end
+
+while current_train_end < evaluation_end:
+    train_data = qpc_data1.loc[qpc_data1.index <= current_train_end].dropna()
+
+    if 'REAL_GDP_QPC' not in train_data.columns or train_data.empty:
+        current_train_end += 1
+        continue
+
+    indicators = train_data.columns.drop('REAL_GDP_QPC')
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(train_data[indicators])
+
+    pca = PCA(n_components=n_factors)
+    factors = pca.fit_transform(X_scaled)
+    factors_df = pd.DataFrame(factors, index=train_data.index, columns=[f'Factor_{i+1}' for i in range(n_factors)])
+
+    combined_df = pd.concat([train_data['REAL_GDP_QPC'], factors_df], axis=1).dropna()
+
+    X = sm.add_constant(combined_df[[f'Factor_{i+1}' for i in range(n_factors)]])
+    y = combined_df['REAL_GDP_QPC']
+    model = sm.OLS(y, X).fit()
+
+    next_period = current_train_end + 1
+    if next_period not in qpc_data1.index:
+        break
+    next_indicators = qpc_data1.loc[next_period, indicators]
+
+    if next_indicators.isnull().any():
+        current_train_end += 1
+        continue
+
+    next_indicators_scaled = scaler.transform(next_indicators.values.reshape(1, -1))
+    next_factors = pca.transform(next_indicators_scaled)
+    X_next = sm.add_constant(pd.DataFrame(next_factors, columns=[f'Factor_{i+1}' for i in range(n_factors)]))
+    X_next = X_next[X.columns]  # Align columns
+
+    forecast = model.predict(X_next)[0]
+
+    # Bootstrap
+    forecasts_boot = []
+    n_samples = X.shape[0]
+    for _ in range(n_bootstrap):
+        idx = np.random.choice(n_samples, size=n_samples, replace=True)
+        X_boot = X.iloc[idx]
+        y_boot = y.iloc[idx]
+        model_boot = sm.OLS(y_boot, X_boot).fit()
+        f_boot = model_boot.predict(X_next)[0]
+        forecasts_boot.append(f_boot)
+
+    lower_bound = np.percentile(forecasts_boot, (100 - confidence_level) / 2)
+    upper_bound = np.percentile(forecasts_boot, 100 - (100 - confidence_level) / 2)
+
+    actual = qpc_data1.loc[next_period, 'REAL_GDP_QPC']
+
+    forecasted.append(forecast)
+    actuals.append(actual)
+    quarters.append(next_period)
+    lower_bounds.append(lower_bound)
+    upper_bounds.append(upper_bound)
+
+    current_train_end += 1
+
+results_dfm = pd.DataFrame({
+    'Quarter': quarters,
+    'Forecast_DFM': forecasted,
+    'Actual': actuals,
+    'CI_Lower_DFM': lower_bounds,
+    'CI_Upper_DFM': upper_bounds
+}).set_index('Quarter')
+
+print(results_dfm)
+
+
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+from sklearn.preprocessing import StandardScaler
+
+n_bootstrap = 100
+confidence_level = 90
+
+forecasted = []
+actuals = []
+quarters = []
+lower_bounds = []
+upper_bounds = []
+
+initial_train_end = pd.Period('2020Q4', freq='Q')
+evaluation_end = pd.Period('2025Q2', freq='Q')
+current_train_end = initial_train_end
+
+while current_train_end < evaluation_end:
+    train_data = qpc_data1.loc[qpc_data1.index <= current_train_end].dropna()
+
+    gdp_col = 'REAL_GDP_QPC'
+    indicators = [col for col in train_data.columns if col != gdp_col]
+
+    X = train_data[indicators]
+    y = train_data[gdp_col]
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    X_scaled_const = sm.add_constant(X_scaled)
+    model = sm.OLS(y, X_scaled_const).fit()
+
+    next_period = current_train_end + 1
+    if next_period not in qpc_data1.index:
+        break
+
+    X_next_raw = qpc_data1.loc[next_period, indicators]
+    if X_next_raw.isnull().any():
+        current_train_end += 1
+        continue
+
+    X_next_scaled = scaler.transform(X_next_raw.values.reshape(1, -1))
+    X_next_const = sm.add_constant(X_next_scaled)
+
+    forecast = model.predict(X_next_const)[0]
+
+    # Bootstrap
+    forecasts_boot = []
+    n_samples = X_scaled_const.shape[0]
+    for _ in range(n_bootstrap):
+        idx = np.random.choice(n_samples, size=n_samples, replace=True)
+        Xb = X_scaled_const[idx]
+        yb = y.iloc[idx]
+        model_boot = sm.OLS(yb, Xb).fit()
+        f_boot = model_boot.predict(X_next_const)[0]
+        forecasts_boot.append(f_boot)
+
+    lower_bound = np.percentile(forecasts_boot, (100 - confidence_level) / 2)
+    upper_bound = np.percentile(forecasts_boot, 100 - (100 - confidence_level) / 2)
+
+    actual = qpc_data1.loc[next_period, gdp_col]
+
+    forecasted.append(forecast)
+    actuals.append(actual)
+    quarters.append(next_period)
+    lower_bounds.append(lower_bound)
+    upper_bounds.append(upper_bound)
+
+    current_train_end += 1
+
+results_indicator = pd.DataFrame({
+    'Quarter': quarters,
+    'Forecast_Indicator': forecasted,
+    'Actual': actuals,
+    'CI_Lower_Indicator': lower_bounds,
+    'CI_Upper_Indicator': upper_bounds
+}).set_index('Quarter')
+
+print(results_indicator)
+
+
+
+from statsmodels.tsa.ar_model import AutoReg
+
+lag_ar = 10
+
+forecasted = []
+actuals = []
+quarters = []
+lower_bounds = []
+upper_bounds = []
+
+current_train_end = initial_train_end
+
+while current_train_end < evaluation_end:
+    series = qpc_data1.loc[:current_train_end, 'REAL_GDP_QPC']
+
+    if series.isnull().any() or len(series) <= lag_ar:
+        current_train_end += 1
+        continue
+
+    model = AutoReg(series, lags=lag_ar, old_names=False).fit()
+
+    next_period = current_train_end + 1
+    if next_period not in qpc_data1.index:
+        break
+
+    forecast = model.predict(start=len(series), end=len(series))[0]
+
+    # Bootstrap residuals
+    resid = model.resid
+    forecasts_boot = []
+    n = len(series)
+    for _ in range(n_bootstrap):
+        boot_resid = np.random.choice(resid, size=n, replace=True)
+        boot_series = series.values[-lag_ar:]  # last lags as start
+        for i in range(1):  # forecast 1 step ahead
+            pred = model.params[0]  # intercept
+            for lag in range(lag_ar):
+                pred += model.params[lag + 1] * boot_series[-lag - 1]
+            pred += boot_resid[i]
+            boot_series = np.append(boot_series, pred)
+        forecasts_boot.append(boot_series[-1])
+
+    lower_bound = np.percentile(forecasts_boot, (100 - confidence_level) / 2)
+    upper_bound = np.percentile(forecasts_boot, 100 - (100 - confidence_level) / 2)
+
+    actual = qpc_data1.loc[next_period, 'REAL_GDP_QPC']
+
+    forecasted.append(forecast)
+    actuals.append(actual)
+    quarters.append(next_period)
+    lower_bounds.append(lower_bound)
+    upper_bounds.append(upper_bound)
+
+    current_train_end += 1
+
+results_ar = pd.DataFrame({
+    'Quarter': quarters,
+    'Forecast_AR': forecasted,
+    'Actual': actuals,
+    'CI_Lower_AR': lower_bounds,
+    'CI_Upper_AR': upper_bounds
+}).set_index('Quarter')
+
+print(results_ar)
+
+
+
+
+
+from statsmodels.tsa.arima.model import ARIMA
+
+p, q = 2, 2  # specify AR and MA order
+
+forecasted = []
+actuals = []
+quarters = []
+lower_bounds = []
+upper_bounds = []
+
+current_train_end = initial_train_end
+
+while current_train_end < evaluation_end:
+    series = qpc_data1.loc[:current_train_end, 'REAL_GDP_QPC']
+
+    if series.isnull().any() or len(series) < (p + q + 10):
+        current_train_end += 1
+        continue
+
+    model = ARIMA(series, order=(p,0,q)).fit()
+
+    next_period = current_train_end + 1
+    if next_period not in qpc_data1.index:
+        break
+
+    forecast_result = model.get_forecast(steps=1)
+    forecast = forecast_result.predicted_mean.iloc[0]
+
+    # Bootstrap residuals from fitted model
+    resid = model.resid
+    forecasts_boot = []
+    n = len(series)
+    for _ in range(n_bootstrap):
+        boot_resid = np.random.choice(resid, size=n, replace=True)
+        boot_series = series.values[-(p+q):]
+        # Simplified bootstrap - advanced bootstrapping requires simulation from ARMA process
+        for i in range(1):
+            pred = model.params.get('const',0)
+            for lag in range(1,p+1):
+                pred += model.params.get(f'ar.L{lag}',0) * boot_series[-lag]
+            for lag in range(1,q+1):
+                pred += model.params.get(f'ma.L{lag}',0) * boot_resid[-lag]
+            pred += boot_resid[-1]
+            boot_series = np.append(boot_series, pred)
+        forecasts_boot.append(boot_series[-1])
+
+    lower_bound = np.percentile(forecasts_boot, (100 - confidence_level) / 2)
+    upper_bound = np.percentile(forecasts_boot, 100 - (100 - confidence_level) / 2)
+
+    actual = qpc_data1.loc[next_period, 'REAL_GDP_QPC']
+
+    forecasted.append(forecast)
+    actuals.append(actual)
+    quarters.append(next_period)
+    lower_bounds.append(lower_bound)
+    upper_bounds.append(upper_bound)
+
+    current_train_end += 1
+
+results_arma = pd.DataFrame({
+    'Quarter': quarters,
+    'Forecast_ARMA': forecasted,
+    'Actual': actuals,
+    'CI_Lower_ARMA': lower_bounds,
+    'CI_Upper_ARMA': upper_bounds
+}).set_index('Quarter')
+
+print(results_arma)
+
+
+
+
+
+
+import numpy as np
+import pandas as pd
+
+def psf_forecast(series, window_size=4, forecast_horizon=1):
+    series = np.array(series)
+    n = len(series)
+    recent_pattern = series[-window_size:]
+    min_dist = float('inf')
+    best_index = -1
+    for i in range(n - window_size - forecast_horizon):
+        pattern = series[i:i + window_size]
+        dist = np.linalg.norm(pattern - recent_pattern)
+        if dist < min_dist:
+            min_dist = dist
+            best_index = i
+    forecast_indices = slice(best_index + window_size, best_index + window_size + forecast_horizon)
+    forecast = series[forecast_indices]
+    return forecast
+
+# Parameters
+window_size = 4
+forecast_horizon = 1
+n_bootstrap = 100
+confidence_level = 90
+
+last_train_index = pd.Period('2020Q4', freq='Q')
+eval_end_index = pd.Period('2025Q2', freq='Q')
+current_index = last_train_index
+
+forecasts = []
+actuals = []
+quarters = []
+lower_bounds = []
+upper_bounds = []
+
+while current_index < eval_end_index:
+    train_data = qpc_data1.loc[:current_index, 'REAL_GDP_QPC_YOY'].dropna()
+
+    if len(train_data) <= window_size + forecast_horizon:
+        current_index += 1
+        continue
+
+    # Point forecast on full training data
+    fc = psf_forecast(train_data, window_size, forecast_horizon)[0]
+
+    # Bootstrap forecasts
+    forecasts_boot = []
+    n = len(train_data)
+
+    for _ in range(n_bootstrap):
+        # Resample training data with replacement
+        boot_sample = train_data.sample(n=n, replace=True).sort_index()
+
+        # Ensure boot_sample sorted
+
