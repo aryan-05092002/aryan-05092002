@@ -64,25 +64,93 @@ results_df = pd.DataFrame({'Quarter': quarters,
 print(results_df)
 
 
+import pandas as pd
 import numpy as np
+from sklearn.linear_model import LassoCV
+from sklearn.preprocessing import StandardScaler
 
-n_bootstrap = 100
-forecasts_boot = []
+variables = [col for col in qpc_data1.columns if col not in ['GDP_QPC', 'decomposition']]
+gdp_col = 'REAL_GDP_QPC_YOY'  # Your GDP variable name
+indicators = variables.copy()
 
-for i in range(n_bootstrap):
-    # Resample training data (X_train, y_train)
-    idx = np.random.choice(len(X_train_scaled), size=len(X_train_scaled), replace=True)
-    X_resampled = X_train_scaled[idx]
-    y_resampled = y_train.iloc[idx]
+initial_train_end = pd.Period('2020Q4', freq='Q')
+evaluation_end = pd.Period('2025Q2', freq='Q')
+current_train_end = initial_train_end
 
-    # Fit Lasso on resampled data
-    model_boot = LassoCV(cv=5, random_state=42).fit(X_resampled, y_resampled)
+forecasted = []
+actuals = []
+quarters = []
+lower_bounds = []
+upper_bounds = []
 
-    # Forecast with model_boot
-    forecast_boot_i = model_boot.predict(X_test_scaled)[0]
-    forecasts_boot.append(forecast_boot_i)
+n_bootstrap = 100  # Number of bootstrap samples
+confidence_level = 90  # Percent
 
-# Calculate confidence intervals (e.g., 5th and 95th percentiles)
-lower_bound = np.percentile(forecasts_boot, 5)
-upper_bound = np.percentile(forecasts_boot, 95)
+while current_train_end < evaluation_end:
+    train_data = qpc_data1.loc[qpc_data1.index <= current_train_end, [gdp_col] + indicators].dropna()
+    if len(train_data) < 10:
+        current_train_end += 1
+        continue
+
+    # Prepare data
+    X = train_data[indicators]
+    y = train_data[gdp_col]
+
+    df_xy = pd.concat([y, X], axis=1).dropna()
+    y_train = df_xy[gdp_col]
+    X_train = df_xy[indicators]
+
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+
+    # Fit Lasso on full training data
+    lasso = LassoCV(cv=5, random_state=42).fit(X_train_scaled, y_train)
+
+    # Prepare test data for next period
+    next_period = current_train_end + 1
+    if next_period not in qpc_data1.index:
+        break
+
+    X_test_raw = qpc_data1.loc[next_period, indicators]
+    if X_test_raw.isnull().any():
+        current_train_end += 1
+        continue
+
+    X_test_scaled = scaler.transform(X_test_raw.values.reshape(1, -1))
+    forecast = lasso.predict(X_test_scaled)[0]
+
+    # Bootstrap to get confidence intervals
+    forecasts_boot = []
+    n_samples = X_train_scaled.shape[0]
+    for _ in range(n_bootstrap):
+        idx = np.random.choice(n_samples, size=n_samples, replace=True)
+        X_resampled = X_train_scaled[idx]
+        y_resampled = y_train.iloc[idx]
+
+        lasso_boot = LassoCV(cv=5, random_state=42).fit(X_resampled, y_resampled)
+        forecast_boot = lasso_boot.predict(X_test_scaled)[0]
+        forecasts_boot.append(forecast_boot)
+
+    lower_bound = np.percentile(forecasts_boot, (100 - confidence_level) / 2)
+    upper_bound = np.percentile(forecasts_boot, 100 - (100 - confidence_level) / 2)
+
+    actual = qpc_data1.loc[next_period, gdp_col]
+
+    forecasted.append(forecast)
+    actuals.append(actual)
+    quarters.append(next_period)
+    lower_bounds.append(lower_bound)
+    upper_bounds.append(upper_bound)
+
+    current_train_end += 1
+
+results_df = pd.DataFrame({
+    'Quarter': quarters,
+    'Forecast_ML_Lasso': forecasted,
+    'Actual': actuals,
+    'CI_Lower': lower_bounds,
+    'CI_Upper': upper_bounds
+}).set_index('Quarter')
+
+print(results_df)
 
