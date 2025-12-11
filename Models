@@ -325,6 +325,130 @@ print(results_df)
 
 
 
+import pandas as pd
+import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import statsmodels.api as sm
+from statsmodels.tsa.statespace.mlemodel import MLEModel
+import pymc as pm
+import arviz as az
+
+# Parameters
+n_factors = 5
+initial_train_end = pd.Period('2020Q4', freq='Q')
+evaluation_end = pd.Period('2025Q2', freq='Q')
+
+# Your dataset: qpc_data1 with quarterly YoY indicators including 'REAL_GDP_QPC_YOY'
+indicators = [col for col in qpc_data1.columns if col != 'REAL_GDP_QPC_YOY']
+
+forecasted = []
+actuals = []
+lower_ci = []
+upper_ci = []
+quarters = []
+samples_per_forecast = 1000  # Number of posterior samples
+
+current_train_end = initial_train_end
+
+while current_train_end < evaluation_end:
+    # Select training data up to current train end
+    train_data = qpc_data1.loc[:current_train_end].dropna(subset=['REAL_GDP_QPC_YOY'] + indicators)
+
+    # Standardize indicators for PCA
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(train_data[indicators])
+
+    # Extract factors with PCA
+    pca = PCA(n_components=n_factors)
+    factors_train = pca.fit_transform(X_train_scaled)
+
+    factors_df = pd.DataFrame(factors_train, index=train_data.index, columns=[f'Factor_{i+1}' for i in range(n_factors)])
+
+    # Combine factors with GDP YoY
+    combined_df = pd.concat([train_data['REAL_GDP_QPC_YOY'], factors_df], axis=1).dropna()
+
+    # Bayesian regression using PyMC
+    X = combined_df[[f'Factor_{i+1}' for i in range(n_factors)]].values
+    y = combined_df['REAL_GDP_QPC_YOY'].values
+    
+    with pm.Model() as bayes_model:
+        # Priors
+        betas = pm.Normal('betas', 0, sigma=10, shape=n_factors)
+        sigma = pm.HalfNormal('sigma', sigma=1)
+        
+        # Add intercept
+        intercept = pm.Normal('intercept', 0, sigma=10)
+        
+        # Expected value
+        mu = intercept + pm.math.dot(X, betas)
+        
+        # Likelihood
+        pm.Normal('obs', mu=mu, sigma=sigma, observed=y)
+        
+        # Sampling
+        trace = pm.sample(1000, tune=1000, target_accept=0.9, return_inferencedata=True)
+
+    # Forecast next period
+    next_period = current_train_end + 1
+    if next_period not in qpc_data1.index:
+        break
+
+    # Prepare factors for next period
+    next_indicators = qpc_data1.loc[next_period, indicators]
+    
+    if next_indicators.isnull().any():
+        current_train_end += 1
+        continue
+
+    next_ind_scaled = scaler.transform(next_indicators.values.reshape(1, -1))
+    next_factors = pca.transform(next_ind_scaled)
+    
+    # Posterior predictive sampling
+    with bayes_model:
+        ppc = pm.sample_posterior_predictive(trace, var_names=['intercept', 'betas', 'sigma'], 
+                                           predictions=True, extend_inferencedata=True)
+    
+    # Calculate forecasts and credible intervals from posterior predictive
+    posterior_preds = ppc.posterior_predictive['obs'].mean(dim=['chain', 'draw']).values[0]
+    
+    # 90% credible intervals
+    lower_5 = ppc.posterior_predictive['obs'].quantile(0.05, dim=['chain', 'draw']).values[0]
+    upper_95 = ppc.posterior_predictive['obs'].quantile(0.95, dim=['chain', 'draw']).values[0]
+    
+    forecasted.append(posterior_preds)
+    actuals.append(qpc_data1.loc[next_period, 'REAL_GDP_QPC_YOY'])
+    lower_ci.append(lower_5)
+    upper_ci.append(upper_95)
+    quarters.append(next_period)
+
+    current_train_end += 1
+
+# Output results with confidence intervals
+results_df = pd.DataFrame({
+    'Quarter': quarters, 
+    'Forecast': forecasted, 
+    'Actual': actuals,
+    'Lower_CI_90': lower_ci,
+    'Upper_CI_90': upper_ci
+}).set_index('Quarter')
+
+print(results_df)
+
+# Optional: Plot results
+import matplotlib.pyplot as plt
+plt.figure(figsize=(12, 6))
+plt.plot(results_df.index, results_df['Actual'], 'o-', label='Actual', linewidth=2)
+plt.plot(results_df.index, results_df['Forecast'], 's-', label='Bayesian Forecast', linewidth=2)
+plt.fill_between(results_df.index, results_df['Lower_CI_90'], results_df['Upper_CI_90'], 
+                alpha=0.3, label='90% Credible Interval')
+plt.title('Bayesian Dynamic Factor Model GDP Nowcast with Credible Intervals')
+plt.ylabel('REAL_GDP_QPC_YOY (%)')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
 
 
 
