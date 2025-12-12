@@ -1,0 +1,236 @@
+import pandas as pd
+import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import statsmodels.api as sm
+import pymc as pm
+import arviz as az
+
+# Parameters
+n_factors = 5
+initial_train_end = pd.Period('2020Q4', freq='Q')
+evaluation_end = pd.Period('2025Q2', freq='Q')
+
+indicators = [col for col in qpc_data1.columns if col != 'REAL_GDP_QPC_YOY']
+
+forecasted = []
+actuals = []
+lower_ci = []
+upper_ci = []
+quarters = []
+
+current_train_end = initial_train_end
+
+while current_train_end < evaluation_end:
+    # Training data
+    train_data = qpc_data1.loc[:current_train_end].dropna(
+        subset=['REAL_GDP_QPC_YOY'] + indicators
+    )
+
+    # PCA on indicators
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(train_data[indicators])
+    pca = PCA(n_components=n_factors)
+    factors_train = pca.fit_transform(X_train_scaled)
+
+    factors_df = pd.DataFrame(
+        factors_train,
+        index=train_data.index,
+        columns=[f'Factor_{i+1}' for i in range(n_factors)]
+    )
+
+    combined_df = pd.concat(
+        [train_data['REAL_GDP_QPC_YOY'], factors_df],
+        axis=1
+    ).dropna()
+
+    X = combined_df[[f'Factor_{i+1}' for i in range(n_factors)]].values
+    y = combined_df['REAL_GDP_QPC_YOY'].values
+
+    # Bayesian regression using PyMC
+    with pm.Model() as bayes_model:
+        # Priors
+        intercept = pm.Normal('intercept', 0, sigma=10)
+        betas = pm.Normal('betas', 0, sigma=10, shape=n_factors)
+        sigma = pm.HalfNormal('sigma', sigma=1)
+
+        # Expected value
+        mu = intercept + pm.math.dot(X, betas)
+
+        # Likelihood
+        obs = pm.Normal('obs', mu=mu, sigma=sigma, observed=y)
+
+        # Sampling
+        trace = pm.sample(
+            1000, tune=1000, target_accept=0.9,
+            return_inferencedata=True, cores=1, random_seed=42
+        )
+
+        # (Optional) in-sample posterior predictive checks
+        ppc_insample = pm.sample_posterior_predictive(
+            trace, var_names=['obs'], random_seed=42
+        )
+
+    # Forecast next period
+    next_period = current_train_end + 1
+    if next_period not in qpc_data1.index:
+        break
+
+    next_indicators = qpc_data1.loc[next_period, indicators]
+    if next_indicators.isnull().any():
+        current_train_end += 1
+        continue
+
+    next_ind_scaled = scaler.transform(next_indicators.values.reshape(1, -1))
+    next_factors = pca.transform(next_ind_scaled)   # shape (1, n_factors)
+
+    # --- Posterior predictive for next period (minimal change) ---
+
+    # Extract posterior draws as numpy arrays
+    intercept_samples = trace.posterior['intercept'].values.reshape(-1)      # (S,)
+    betas_samples = trace.posterior['betas'].values.reshape(-1, n_factors)   # (S, k)
+    sigma_samples = trace.posterior['sigma'].values.reshape(-1)              # (S,)
+
+    x_next = next_factors.flatten()  # shape (k,)
+
+    # Mean for next period for each posterior draw
+    mu_next = intercept_samples + np.dot(betas_samples, x_next)             # (S,)
+
+    # Add observation noise to get full predictive distribution
+    predictive_draws = np.random.normal(mu_next, sigma_samples)             # (S,)
+
+    # Point forecast and 90% credible interval
+    forecast = predictive_draws.mean()
+    ci_lower = np.quantile(predictive_draws, 0.05)
+    ci_upper = np.quantile(predictive_draws, 0.95)
+
+    forecasted.append(forecast)
+    actuals.append(qpc_data1.loc[next_period, 'REAL_GDP_QPC_YOY'])
+    lower_ci.append(ci_lower)
+    upper_ci.append(ci_upper)
+    quarters.append(next_period)
+
+    current_train_end += 1
+
+# Results with credible intervals
+results_df = pd.DataFrame({
+    'Quarter': quarters,
+    'Forecast': forecasted,
+    'Actual': actuals,
+    'Lower_CI_90': lower_ci,
+    'Upper_CI_90': upper_ci
+}).set_index('Quarter')
+
+print(results_df)
+
+
+
+import pandas as pd
+import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import statsmodels.api as sm
+import pymc as pm
+
+# Parameters
+n_factors = 5
+initial_train_end = pd.Period('2020Q4', freq='Q')
+evaluation_end = pd.Period('2025Q2', freq='Q')
+
+indicators = [col for col in qpc_data1.columns if col != 'REAL_GDP_QPC_YOY']
+
+forecasted = []
+actuals = []
+lower_ci = []
+upper_ci = []
+quarters = []
+
+current_train_end = initial_train_end
+
+while current_train_end < evaluation_end:
+    # Select training data
+    train_data = qpc_data1.loc[:current_train_end].dropna(subset=['REAL_GDP_QPC_YOY'] + indicators)
+
+    # PCA
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(train_data[indicators])
+    pca = PCA(n_components=n_factors)
+    factors_train = pca.fit_transform(X_train_scaled)
+
+    factors_df = pd.DataFrame(
+        factors_train,
+        index=train_data.index,
+        columns=[f'Factor_{i+1}' for i in range(n_factors)]
+    )
+
+    combined_df = pd.concat(
+        [train_data['REAL_GDP_QPC_YOY'], factors_df],
+        axis=1
+    ).dropna()
+
+    X = combined_df[[f'Factor_{i+1}' for i in range(n_factors)]].values
+    y = combined_df['REAL_GDP_QPC_YOY'].values
+
+    # Bayesian regression
+    with pm.Model() as bayes_model:
+        intercept = pm.Normal('intercept', 0, sigma=10)
+        betas = pm.Normal('betas', 0, sigma=10, shape=n_factors)
+        sigma = pm.HalfNormal('sigma', sigma=1)
+
+        mu = intercept + pm.math.dot(X, betas)
+        pm.Normal('obs', mu=mu, sigma=sigma, observed=y)
+
+        trace = pm.sample(1000, tune=1000, target_accept=0.9, cores=1, random_seed=42)
+
+    # Next period
+    next_period = current_train_end + 1
+    if next_period not in qpc_data1.index:
+        break
+
+    next_indicators = qpc_data1.loc[next_period, indicators]
+    if next_indicators.isnull().any():
+        current_train_end += 1
+        continue
+
+    next_ind_scaled = scaler.transform(next_indicators.values.reshape(1, -1))
+    next_factors = pca.transform(next_ind_scaled)  # shape (1, n_factors)
+
+    # Build posterior predictive for next period "by hand"
+    intercept_samples = trace.posterior['intercept'].values.reshape(-1)   # (chains*draws,)
+    betas_samples = trace.posterior['betas'].values.reshape(-1, n_factors)
+    sigma_samples = trace.posterior['sigma'].values.reshape(-1)
+
+    # Deterministic mean for next period: mu_next = a + X_next * beta
+    mu_next = (
+        intercept_samples
+        + np.dot(betas_samples, next_factors.flatten())
+    )
+
+    # Add observation noise for predictive distribution
+    predictive_draws = np.random.normal(mu_next, sigma_samples)
+
+    # Point forecast and 90% credible interval
+    forecast = np.mean(predictive_draws)
+    ci_lower = np.quantile(predictive_draws, 0.05)
+    ci_upper = np.quantile(predictive_draws, 0.95)
+
+    forecasted.append(forecast)
+    actuals.append(qpc_data1.loc[next_period, 'REAL_GDP_QPC_YOY'])
+    lower_ci.append(ci_lower)
+    upper_ci.append(ci_upper)
+    quarters.append(next_period)
+
+    current_train_end += 1
+
+results_df = pd.DataFrame(
+    {
+        'Quarter': quarters,
+        'Forecast': forecasted,
+        'Actual': actuals,
+        'Lower_CI_90': lower_ci,
+        'Upper_CI_90': upper_ci
+    }
+).set_index('Quarter')
+
+print(results_df)
+
