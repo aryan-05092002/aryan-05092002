@@ -234,3 +234,47 @@ results_df = pd.DataFrame(
 
 print(results_df)
 
+
+| Dimension                   | Your PCA–Bayesian model                                                                 | New York Fed Staff Nowcast                                                                                           |
+|----------------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------|
+| Core framework             | Static regression of GDP YoY on contemporaneous PCA factors                             | Bayesian dynamic factor model in full state‑space form (transition + measurement equations) [1][2]        |
+| Factors                    | PCA factors estimated from standardized quarterly indicators (static)                   | Latent dynamic factors jointly estimated with all series, with autoregressive dynamics [1][3]             |
+| Dynamics                   | No explicit factor dynamics; persistence mainly via regression residuals                | Explicit AR dynamics for factors and idiosyncratic components [1]                                              |
+| Data frequency             | Purely quarterly (YoY GDP and quarterly indicators)                                     | Mixed‑frequency: monthly and quarterly indicators in one system [1][4]                                    |
+| Data flow / updating       | Expanding‑window re‑estimation each quarter; one‑step‑ahead quarterly forecasts         | Weekly nowcast updates as each new monthly/weekly release arrives [1][5]                                   |
+| Release calendar / lags    | Does not model exact release dates or publication lags                                  | Explicit release calendar and publication lags; reacts to each scheduled release [1][5]                    |
+| Real‑time vintages         | Typically single data vintage; no explicit revision handling                            | Built on real‑time vintages; tracks revisions and their impact on the nowcast [1][5]                      |
+| Uncertainty quantification | Bayesian only at regression stage; homoskedastic error, no latent‑state uncertainty     | Full Bayesian uncertainty over factors, measurement errors, volatility, and outliers [1][6]               |
+| Shocks / volatility        | Single constant variance parameter                                                       | Stochastic volatility and explicit outlier components for large shocks (e.g., pandemic) [1]                    |
+| Decomposition of changes   | No formal decomposition of forecast revisions                                            | Decomposes weekly nowcast changes into contributions by release, revision, and outlier updates [1]             |
+| Cross‑section size         | Medium‑sized panel of indicators (as you choose)                                        | Large macro panel: real activity, prices, surveys, and financial variables [1][3]                          |
+| Estimation frequency       | Parameters re‑estimated each quarter in an expanding window                             | Parameters re‑estimated periodically; states updated weekly via Kalman filtering/smoothing [1][2]        |
+| Output frequency           | Quarterly nowcasts/forecasts                                                            | Weekly nowcast for current and near‑term GDP growth [4]                                                         |
+| Operational role           | Prototype / research‑oriented nowcast                                                   | Production policy tool with public release and dashboard [5][4]                                           |
+
+Sources
+[1] The New York Fed Staff Nowcast 2.0 https://www.newyorkfed.org/medialibrary/media/research/blog/2023/NYFed-Staff-Nowcast_technical-paper
+[2] Component-Based Dynamic Factor Nowcast Model https://www.newyorkfed.org/research/staff_reports/sr1152.html
+[3] FRBNY-TimeSeriesAnalysis/Nowcasting https://github.com/FRBNY-TimeSeriesAnalysis/Nowcasting
+[4] New York Fed Staff Nowcast https://www.newyorkfed.org/research/policy/nowcast?mod=livecoverage_web
+[5] New York Fed Relaunches Staff Nowcast https://www.newyorkfed.org/newsevents/news/research/2023/20230908
+[6] Reintroducing the New York Fed Staff Nowcast https://fedinprint.org/item/fednls/96733
+
+
+
+
+| Aspect                      | Your PCA–Bayesian model                                                                 | New York Fed Staff Nowcast                                                                 |
+|-----------------------------|------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
+| Overall goal                | Nowcast/forecast near‑term real GDP growth from a large set of indicators               | Nowcast/forecast near‑term real GDP growth from a large set of indicators  |
+| Core idea                   | Summarize many indicators into a few common factors, then map factors to GDP            | Summarize many indicators into a few common factors, then map factors to GDP  |
+| Data‑rich design            | Uses a panel of macro indicators rather than a small VAR/AR model                       | Uses a large macro panel (real, nominal, survey, financial series)        |
+| Factor methodology          | Extracts low‑dimensional factors (via PCA) from standardized indicators                 | Uses dynamic factors; methodology rooted in PCA / factor‑model nowcasting literature  |
+| GDP equation                | Regresses GDP growth on a small set of common factors                                   | Regresses GDP growth on a small set of common factors within the dynamic factor system  |
+| Horizon focus               | Focus on current/next quarter GDP (short horizon, business‑cycle nowcasting)            | Focus on current/next quarter GDP (nowcasting the business cycle)         |
+| Updating logic              | Re‑estimates using expanding data as new observations arrive                            | Updates state and forecasts as new releases arrive; parameters re‑estimated periodically  |
+| Uncertainty treatment       | Uses Bayesian regression to obtain posterior distributions and credible intervals       | Uses Bayesian/state‑space methods to obtain predictive densities and intervals  |
+| Output type                 | Point nowcast plus credible interval for GDP growth                                      | Point nowcast plus predictive intervals/densities for GDP growth          |
+| Conceptual pipeline         | “Indicators → factors → GDP mapping”                                                    | “Indicators → dynamic factors → GDP mapping”                              |
+
+Sources
+
