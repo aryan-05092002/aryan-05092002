@@ -519,3 +519,43 @@ plt.grid(True, alpha=0.3)
 plt.legend(fontsize=8, ncol=2)
 plt.tight_layout()
 plt.show()
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+# df_all as in your code
+df_all = pd.DataFrame()
+df_all['Actual'] = results_ar['Actual']
+df_all['AR'] = results_ar['Forecast']
+df_all['ARMA'] = results_arma['Forecast']
+df_all['Indicator'] = results_ols['Forecast']
+df_all['PSF'] = results_psf['Forecast']
+
+# Use EWMA for smoothing (change alpha for more/less smoothing)
+alpha = 0.3  # lower = smoother
+
+df_smooth = pd.DataFrame(index=df_all.index)
+df_smooth['Actual'] = df_all['Actual'].ewm(alpha=alpha, adjust=False).mean()
+df_smooth['AR'] = df_all['AR'].ewm(alpha=alpha, adjust=False).mean()
+df_smooth['ARMA'] = df_all['ARMA'].ewm(alpha=alpha, adjust=False).mean()
+df_smooth['Indicator'] = df_all['Indicator'].ewm(alpha=alpha, adjust=False).mean()
+df_smooth['PSF'] = df_all['PSF'].ewm(alpha=alpha, adjust=False).mean()
+
+plt.figure(figsize=(14, 6))
+
+# Smoothed lines
+plt.plot(df_smooth.index, df_smooth['Actual'], label='Actual (smoothed)', linewidth=3, color='black')
+plt.plot(df_smooth.index, df_smooth['AR'], label='AR (smoothed)', linestyle='--')
+plt.plot(df_smooth.index, df_smooth['ARMA'], label='ARMA (smoothed)', linestyle='--')
+plt.plot(df_smooth.index, df_smooth['Indicator'], label='Indicator OLS (smoothed)', linestyle='-.')
+plt.plot(df_smooth.index, df_smooth['PSF'], label='PSF (smoothed)', linestyle=':')
+
+plt.title('Nowcasting Forecasts vs Actual GDP (EWMA smoothed)')
+plt.xlabel('Quarter')
+plt.ylabel('GDP Growth')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
