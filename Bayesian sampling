@@ -278,3 +278,97 @@ Sources
 
 Sources
 
+
+
+import pandas as pd
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import statsmodels.api as sm
+
+# Parameters
+n_factors = 5
+initial_train_end = pd.Period('2020Q4', freq='Q')
+evaluation_end = pd.Period('2025Q3', freq='Q')  # Extended to include 2025Q3
+
+# Your dataset: qpc_data1 with quarterly YoY indicators including 'REAL_GDP_QPC_YOY'
+indicators = [col for col in qpc_data1.columns if col != 'REAL_GDP_QPC_YOY']
+
+forecasted = []
+actuals = []
+quarters = []
+
+current_train_end = initial_train_end
+
+while current_train_end < evaluation_end:
+    # Select training data up to current train end
+    train_data = qpc_data1.loc[:current_train_end].dropna(subset=['REAL_GDP_QPC_YOY'] + indicators)
+
+    # Standardize indicators for PCA
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(train_data[indicators])
+
+    # Extract factors with PCA
+    pca = PCA(n_components=n_factors)
+    factors_train = pca.fit_transform(X_train_scaled)
+
+    factors_df = pd.DataFrame(factors_train, index=train_data.index, columns=[f'Factor_{i+1}' for i in range(n_factors)])
+
+    # Combine factors with GDP YoY
+    combined_df = pd.concat([train_data['REAL_GDP_QPC_YOY'], factors_df], axis=1).dropna()
+
+    # Regression of GDP on factors
+    X = sm.add_constant(combined_df[[f'Factor_{i+1}' for i in range(n_factors)]])
+    y = combined_df['REAL_GDP_QPC_YOY']
+    model = sm.OLS(y, X).fit()
+
+    # Forecast next period
+    next_period = current_train_end + 1
+    
+    # For 2025Q3 (out-of-sample), we don't check if it exists in index
+    if next_period > pd.Period('2025Q2', freq='Q'):  # Out-of-sample forecast
+        # Use latest available indicators for 2025Q3 forecast
+        latest_indicators = qpc_data1.loc[pd.Period('2025Q2', freq='Q'), indicators]
+        
+        if latest_indicators.isnull().any():
+            print(f"Missing indicators for 2025Q3 forecast using 2025Q2 data")
+            break
+            
+        next_ind_scaled = scaler.transform(latest_indicators.values.reshape(1, -1))
+        next_factors = pca.transform(next_ind_scaled)
+        X_next = sm.add_constant(pd.DataFrame(next_factors, columns=[f'Factor_{i+1}' for i in range(n_factors)]))
+        X_next = X_next[X.columns]  # Align columns
+        
+        forecast_2025q3 = model.predict(X_next)[0]
+        
+        # Store 2025Q3 forecast (no actual value available)
+        forecasted.append(forecast_2025q3)
+        actuals.append(np.nan)  # No actual for out-of-sample
+        quarters.append(next_period)
+        print(f"2025Q3 DFM Forecast: {forecast_2025q3:.4f}")
+        break
+    else:
+        # In-sample forecasts (up to 2025Q2)
+        if next_period not in qpc_data1.index:
+            break
+
+        next_indicators = qpc_data1.loc[next_period, indicators]
+        if next_indicators.isnull().any():
+            current_train_end += 1
+            continue
+
+        next_ind_scaled = scaler.transform(next_indicators.values.reshape(1, -1))
+        next_factors = pca.transform(next_ind_scaled)
+        X_next = sm.add_constant(pd.DataFrame(next_factors, columns=[f'Factor_{i+1}' for i in range(n_factors)]))
+        X_next = X_next[X.columns]  # Align columns
+
+        forecast = model.predict(X_next)[0]
+        forecasted.append(forecast)
+        actuals.append(qpc_data1.loc[next_period, 'REAL_GDP_QPC_YOY'])
+        quarters.append(next_period)
+
+    current_train_end += 1
+
+# Output results
+results_df = pd.DataFrame({'Quarter': quarters, 'Forecast': forecasted, 'Actual': actuals}).set_index('Quarter')
+print(results_df)
+
