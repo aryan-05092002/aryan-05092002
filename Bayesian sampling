@@ -478,3 +478,44 @@ results_df = pd.DataFrame({'Quarter': quarters, 'Forecast': forecasted, 'Actual'
 print("\nFinal Results (including 2025Q3 forecast):")
 print(results_df)
 
+
+
+import matplotlib.pyplot as plt
+
+forecast_cols = [
+    'Forecast_AR',
+    'Forecast_VAR',
+    'Forecast_DFM',
+    'Forecast_Lasso',
+    'Forecast_Indicator',
+    'Forecast_ARMA',
+    'Forecast_PSF',
+    'Forecast_Combined'
+]
+
+alpha = 0.3  # smoothing factor (0–1); lower = smoother
+
+df_plot = df_all.copy()
+
+# EWMA smoothing
+df_plot['Actual_smooth'] = df_plot['Actual'].ewm(alpha=alpha, adjust=False).mean()
+for col in forecast_cols:
+    df_plot[col + '_smooth'] = df_plot[col].ewm(alpha=alpha, adjust=False).mean()
+
+x = df_plot.index.to_timestamp()
+
+plt.figure(figsize=(12, 7))
+
+plt.plot(x, df_plot['Actual_smooth'], color='black', linewidth=2, label='Actual (EWMA)')
+
+for col in forecast_cols:
+    plt.plot(x, df_plot[col + '_smooth'], linewidth=1.5, alpha=0.8,
+             label=col.replace('Forecast_', '') + ' (EWMA)')
+
+plt.xlabel('Quarter')
+plt.ylabel('REAL_GDP_QPC_YOY')
+plt.title('Actual vs 8 Model Forecasts (EWMA smoothed)')
+plt.grid(True, alpha=0.3)
+plt.legend(fontsize=8, ncol=2)
+plt.tight_layout()
+plt.show()
