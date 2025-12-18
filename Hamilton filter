@@ -1,0 +1,96 @@
+import pandas as pd
+import numpy as np
+from scipy.optimize import minimize
+import warnings
+warnings.filterwarnings('ignore')
+
+def hamilton_filter(y, k=2, trim=0.01):
+    """
+    Hamilton filter for productivity adjustment of REER series.
+    Returns trend component for productivity-adjusted REER.
+    
+    Parameters:
+    y: numpy array of log(REER)
+    k: number of lags in Hamilton filter (default=2)
+    trim: trimming parameter for endpoint correction
+    """
+    T = len(y)
+    if T < 2*k + 10:
+        return y  # Not enough data
+    
+    # Prepare lagged matrix X
+    X = np.zeros((T-k, k))
+    for i in range(k):
+        X[:, i] = y[k+i] - y[i:i+(T-k)]
+    
+    # Hamilton filter weights (minimize variance)
+    def objective(theta):
+        theta = np.array(theta)
+        filt = np.dot(X, theta)
+        return np.var(filt)
+    
+    # Optimize filter coefficients
+    res = minimize(objective, x0=np.ones(k)/k, method='L-BFGS-B')
+    theta_opt = res.x
+    
+    # Apply filter
+    filt = np.dot(X, theta_opt)
+    
+    # Extend filter to full sample with endpoint correction
+    trend = np.zeros(T)
+    trend[k:] = filt.cumsum()
+    
+    # Forward-backward smoothing (Hamilton endpoint correction)
+    alpha = trim / (1 + trim)
+    
+    # Backward pass
+    for t in range(T-2, k-1, -1):
+        trend[t] = alpha * trend[t] + (1-alpha) * trend[t+1]
+    
+    # Forward pass refinement
+    for t in range(k, T):
+        trend[t] = alpha * trend[t] + (1-alpha) * trend[t-1]
+    
+    return trend
+
+# Main processing function
+def process_reer_hamilton(excel_file, sheet_name=0, reer_col_pattern='REER'):
+    """
+    Process Bruegel REER Excel file with Hamilton filter for all countries.
+    """
+    # Read Excel file
+    df = pd.read_excel(excel_file, sheet_name=sheet_name, index_col=0)
+    df.index = pd.to_datetime(df.index, format='%Y-%m')  # Monthly dates
+    
+    results = {}
+    
+    for col in df.columns:
+        if 'REER' in str(col).upper():  # Match REER columns
+            print(f"Processing {col}...")
+            
+            # Take log of REER (standard for Hamilton filter)
+            reer_log = np.log(df[col].dropna())
+            
+            if len(reer_log) > 24:  # Minimum observations
+                # Apply Hamilton filter
+                trend = hamilton_filter(reer_log.values)
+                
+                # Exponentiate back to levels for productivity-adjusted REER
+                reer_adj = np.exp(trend)
+                
+                results[col] = pd.Series(reer_adj, index=reer_log.index)
+    
+    # Create results DataFrame
+    results_df = pd.DataFrame(results)
+    
+    return df, results_df
+
+# Usage example:
+# excel_file = 'bruegel_reer.xlsx'
+# original_df, adjusted_df = process_reer_hamilton(excel_file)
+
+# Save results
+# adjusted_df.to_excel('reer_hamilton_adjusted.xlsx')
+
+print("Hamilton filter code ready. Replace 'bruegel_reer.xlsx' with your file path.")
+
