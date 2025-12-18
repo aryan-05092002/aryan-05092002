@@ -207,3 +207,22 @@ with pd.ExcelWriter(output_file) as writer:
 print(f"✅ Saved: {output_file}")
 print("📈 Productivity-adjusted REER now in ~100 range (matches raw data)")
 
+
+def select_k(y, k_max=6):
+    """AIC for optimal k selection."""
+    best_k, best_aic = 0, np.inf
+    
+    for k in range(1, k_max+1):
+        X = np.zeros((len(y)-k, k))
+        for i in range(k):
+            X[:, i] = y[k+i] - y[i:i+(len(y)-k)]
+        
+        theta = np.linalg.lstsq(X, np.diff(y[k:]), rcond=None)[0]
+        resid_var = np.var(np.dot(X, theta) - np.diff(y[k:]))
+        aic = len(y) * np.log(resid_var) + 2 * k  # AIC
+        
+        if aic < best_aic:
+            best_aic, best_k = aic, k
+    
+    return best_k
+
