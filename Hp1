@@ -1,0 +1,80 @@
+import pandas as pd
+import numpy as np
+from scipy.optimize import minimize
+import warnings
+warnings.filterwarnings('ignore')
+
+def hamilton_filter_2yr(y, k=12, trim=0.02):
+    """Hamilton filter with 12 regressors (2-year lags: t-24 to t-35)."""
+    T = len(y)
+    if T < 36 + 10:  # Need 35 lags + buffer
+        return y
+    
+    # 2-YEAR LAGS: t-24 to t-35 (12 regressors)
+    X = np.zeros((T-35, k))
+    for i in range(k):
+        lag = 24 + i  # 24,25,...,35
+        X[:, i] = y[lag:lag+(T-35)] - y[:T-35]
+    
+    def objective(theta):
+        filt = np.dot(X, theta)
+        return np.var(filt)
+    
+    res = minimize(objective, x0=np.ones(k)/k, 
+                   method='L-BFGS-B', 
+                   bounds=[(-1,1)]*k)
+    theta_opt = res.x
+    
+    filt = np.dot(X, theta_opt)
+    trend = np.zeros(T)
+    trend[35:] = filt.cumsum()
+    
+    alpha = trim / (1 + trim)
+    
+    for t in range(T-2, 34, -1):
+        trend[t] = alpha * trend[t] + (1-alpha) * trend[t+1]
+    
+    for t in range(35, T):
+        trend[t] = alpha * trend[t] + (1-alpha) * trend[t-1]
+    
+    return trend
+
+def process_bruegel_reer(excel_file, sheet_name='Bruegel', trim=0.02):
+    """Process Bruegel REER with 2-year lag Hamilton filter."""
+    print("🔄 Loading Bruegel REER data (2-year lag model)...")
+    df = pd.read_excel(excel_file, sheet_name=sheet_name, index_col=0)
+    df.index = pd.to_datetime(df.index, format='%Y-%m')
+    
+    print(f"📊 {len(df)} months | {len(df.columns)} countries")
+    print("Formula: REER_t = b0 + b1*ΔREER_{t-24} + ... + b12*ΔREER_{t-35}")
+    
+    results = {}
+    for col in df.columns:
+        reer_series = df[col].dropna()
+        reer_series = reer_series[reer_series > 0]
+        
+        if len(reer_series) > 48:  # Need 4 years min for 2-yr lags
+            reer_log = np.log(reer_series.values)
+            trend_log = hamilton_filter_2yr(reer_log)
+            
+            # Scaling to match raw levels
+            scale_factor = np.mean(reer_log) - np.mean(trend_log)
+            trend_log_scaled = trend_log + scale_factor
+            results[col] = pd.Series(np.exp(trend_log_scaled), index=reer_series.index)
+    
+    results_df = pd.DataFrame(results)
+    print(f"🎉 Processed {len(results)} countries with 2-year lag filter")
+    return df, results_df
+
+# EXECUTION
+excel_file = "bruegel_reer.xlsx"  # YOUR FILE HERE
+
+original_df, adjusted_df = process_bruegel_reer(excel_file, sheet_name='Bruegel')
+
+# Auto-save
+output_file = "reer_hamilton_2yr_adjusted.xlsx"
+with pd.ExcelWriter(output_file) as writer:
+    original_df.to_excel(writer, sheet_name='Original')
+    adjusted_df.to_excel(writer, sheet_name='Adjusted')
+
+print(f"✅ Saved: {output_file} (2-year lag model)")
