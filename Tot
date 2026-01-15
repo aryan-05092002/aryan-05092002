@@ -40,3 +40,11 @@ print("Commodities:", terms_of_trade[month_key][0])
 print("Countries dict keys:", list(terms_of_trade[month_key][1].keys()))
 print("Egypt values:", terms_of_trade[month_key][1]['Egypt'].values)
 print("Type:", type(terms_of_trade[month_key][1]['Egypt']))  # Series
+
+
+
+Hi Raghav,
+Please find attached the Faast Gbam notebook, which contains the final trade matrix and the Python code to generate a dictionary with keys as months and values as (countries, commodities) pairs to produce the desired output.
+Currently, the dataset includes monthly trade data from January 2010 to October 2025, and sub-Saharan African countries have been added as well, though their data coverage remains limited.
+Please review and let me know if any changes are required.
+Best,  
