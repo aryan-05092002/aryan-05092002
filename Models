@@ -555,6 +555,25 @@ results_df['Error'] = results_df['Forecast'] - results_df['Actual']
 results_df['RMSE_4q'] = results_df['Error'].rolling(4, min_periods=4).apply(lambda x: np.sqrt(np.mean(x**2)))
 print(results_df)
 
+# After model fit, get training column structure
+n_features = X_scaled.shape[1]  # 83 vars (no constant)
 
+# Build X_next with exact feature order
+X_next_list = []
+for lag in range(n_lags):
+    prev_period = next_period - lag - 1
+    if prev_period in qpc_data1.index:
+        prev_inds = qpc_data1.loc[prev_period, indicators].values
+    else:
+        prev_inds = next_indicators.values
+    X_next_list.append(prev_inds)
+
+X_next_raw = np.hstack(X_next_list)  # Shape: (n_indicators * n_lags,)
+assert X_next_raw.shape[0] == n_features, f"Shape mismatch: {X_next_raw.shape[0]} vs {n_features}"
+
+X_next_scaled = scaler.transform(X_next_raw.reshape(1, -1))
+X_next_gls = sm.add_constant(X_next_scaled, has_constant='add')  # Ensures exact match
+
+forecast = model.predict(X_next_gls)[0]
 
 
