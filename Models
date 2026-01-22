@@ -452,9 +452,108 @@ plt.show()
 
 
 
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+import statsmodels.api as sm
+from statsmodels.regression.linear_model import GLS
+
+# Parameters
+n_lags = 3  # Lags per indicator
+initial_train_end = pd.Period('2020Q4', freq='Q')
+evaluation_end = pd.Period('2025Q2', freq='Q')
+indicators = [col for col in qpc_data1.columns if col != 'REAL_GDP_QPC_YOY']
+
+forecasted = []
+actuals = []
+quarters = []
+
+current_train_end = initial_train_end
+
+while current_train_end < evaluation_end:
+    # Training data
+    train_data = qpc_data1.loc[:current_train_end].dropna(subset=['REAL_GDP_QPC_YOY'] + indicators)
+    
+    if len(train_data) < n_lags + 1:
+        current_train_end += 1
+        continue
+    
+    # Create lagged indicators (X_t includes lags 0 to n_lags-1)
+    X_train = pd.DataFrame(index=train_data.index)
+    for lag in range(n_lags):
+        lagged = train_data[indicators].shift(lag)
+        X_train = pd.concat([X_train, lagged.add_suffix(f'_lag{lag}')], axis=1)
+    
+    X_train = X_train.dropna()
+    y_train = train_data.loc[X_train.index, 'REAL_GDP_QPC_YOY']
+    
+    # Standardize X
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X_train)
+    
+    # Beta weights for each lag (replicated across indicators)
+    beta0 = np.exp(np.linspace(0, -2, n_lags))
+    beta0 /= beta0.sum()
+    
+    # Weight matrices for GLS (one per lag group)
+    W_list = []
+    for i in range(n_lags):
+        k = len(indicators)
+        W_i = np.diag(np.tile(beta0[i], k))
+        W_list.append(W_i)
+    
+    # Stacked weights
+    W = np.block([[W] for W in W_list])
+    
+    # GLS estimation
+    X_gls = sm.add_constant(X_scaled)
+    model = GLS(y_train, X_gls, sigma=W).fit()
+    
+    # Next period
+    next_period = current_train_end + 1
+    if next_period not in qpc_data1.index:
+        break
+    
+    next_indicators = qpc_data1.loc[next_period, indicators]
+    if next_indicators.isnull().any():
+        current_train_end += 1
+        continue
+    
+    # Lags for forecast: use previous quarters' data
+    X_next_list = []
+    for lag in range(n_lags):
+        prev_period = next_period - lag - 1  # lag 0 uses end-of-training indicators
+        if prev_period in qpc_data1.index:
+            prev_inds = qpc_data1.loc[prev_period, indicators].values
+        else:
+            prev_inds = next_indicators.values  # Fallback
+        X_next_list.append(prev_inds)
+    
+    X_next = np.hstack(X_next_list)
+    X_next_scaled = scaler.transform(X_next.reshape(1, -1))
+    X_next_gls = sm.add_constant(X_next_scaled)
+    
+    forecast = model.predict(X_next_gls)[0]
+    
+    forecasted.append(forecast)
+    actuals.append(qpc_data1.loc[next_period, 'REAL_GDP_QPC_YOY'])
+    quarters.append(next_period)
+    
+    current_train_end += 1
+
+# Results with rolling RMSE
+results_df = pd.DataFrame({'Quarter': quarters, 'Forecast': forecasted, 'Actual': actuals}).set_index('Quarter')
+results_df['Error'] = results_df['Forecast'] - results_df['Actual']
+results_df['RMSE_4q'] = results_df['Error'].rolling(4, min_periods=4).apply(lambda x: np.sqrt(np.mean(x**2)))
+print(results_df)
 
 
 
+# Output results
+results_df = pd.DataFrame({'Quarter': quarters, 'Forecast': forecasted, 'Actual': actuals}).set_index('Quarter')
+results_df['Error'] = results_df['Forecast'] - results_df['Actual']
+results_df['RMSE_4q'] = results_df['Error'].rolling(4, min_periods=4).apply(lambda x: np.sqrt(np.mean(x**2)))
+print(results_df)
 
 
 
