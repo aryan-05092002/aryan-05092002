@@ -8,3 +8,35 @@ Sources
 
 South Africa’s quarterly GDP statistics are subject to an 85-day publication lag, which creates significant information gaps for real-time economic analysis and decision-making. Nowcasting addresses this challenge by estimating current-quarter GDP growth using higher-frequency monthly indicators such as retail sales, PMI, and electricity usage through purpose-built econometric models. This paper develops a comprehensive nowcasting framework for South African quarterly GDP year-over-year (YoY) growth using 19 mixed-frequency indicators spanning 1999Q1 through 2025Q4.
 The empirical strategy employs a model suite comprising autoregressive AR(1,4) benchmarks, ARMA(1,0,2) specifications with lags determined by autocorrelation and partial autocorrelation function analysis, pooled indicator regressions, vector autoregressions, mixed-data sampling regressions, a five-factor dynamic factor model, LASSO regularization, and principal surrogate factor models, augmented by a structural dummy variable equal to unity from 2016Q1 onwards. Recursive step-ahead forecasts are generated using an initial training period of 1999Q1–2021Q4 to predict 2022Q1, with subsequent forecasts produced through four-quarter rolling window expansions. The forecast combination, optimally weighted by inverse rolling-window mean squared errors, delivers superior nowcast accuracy by systematically exploiting complementary model strengths while mitigating individual model biases.
+
+
+**Table A1: Variables, Transformations, and Economic Rationale**
+
+| **#** | **Variable**                | **Freq** | **Units**     | **Transformation**    | **Rationale and Nowcasting Use Case**                                                                 |
+|-------|-----------------------------|----------|---------------|----------------------|-------------------------------------------------------------------------------------------------------|
+|       | **TRENDING FLOWS (Log-Transformed)**                                                                                                                    |          |               |                      |                                                                                                       |
+| 1     | Retail Sales                | M        | Million ZAR   | log(Retail)          | Stabilizes exponential retail growth while preserving current consumption level signals quarterly household spending |
+| 2     | Wholesale Sales             | M        | Million ZAR   | log(Wholesale)       | Removes trade flow trend; captures inventory cycles leading business investment                       |
+| 3     | Passenger Vehicle Sales     | M        | Units         | log(Vehicles)        | Unit sales compound; durable consumption proxy signals consumer confidence                            |
+| 4     | Credit Extension            | M        | Million ZAR   | log(Credit)          | Financial accelerator; log-credit levels track borrowing capacity for investment                      |
+| 5     | Electricity Consumption     | M        | GWH           | log(Consumption)     | Real activity proxy; industrial demand coincident with manufacturing GDP                              |
+| 6     | Building Plans Passed       | M        | 000s ZAR      | log(Plans)           | Leading construction investment; log-value stabilizes variance                                        |
+| 7     | Mining Sales                | M        | Million ZAR   | log(Mining)          | Commodity export driver (8% GDP); terms-of-trade coincident                                           |
+| 8     | Electricity Production      | M        | GWH           | log(Production)      | Capacity utilization constraint; supply-side industrial activity                                      |
+| 9     | Building Plans Completed    | M        | 000s ZAR      | log(Completed)       | Construction coincident indicator following plans                                                     |
+| 10    | M3 Money Supply             | M        | Million ZAR   | log(M3)              | Liquidity captures aggregate demand pressure via velocity                                             |
+|       | **STATIONARY INDICES (Raw Levels)**                                                                                                                     |          |               |                      |                                                                                                       |
+| 11    | New Vehicle Sales Index     | M        | 2019=100      | Raw                  | Normalized volume index; manufacturing + consumption coincident                                       |
+| 12    | Business Cycle Composite Leader | M     | 2019=100      | Raw                  | OECD-style leading composite; cycle turning points                                                    |
+| 13    | CPI All Items               | M        | Dec2024=100   | Raw                  | Price level coincident; preserves inflation pass-through                                              |
+| 14    | REER                        | M        | 2015=100      | Raw                  | Competitiveness level drives trade elasticities                                                       |
+| 15    | PMI                         | M        | 50+=expansion | Raw                  | Diffusion index optimal (>50=expansion); flash GDP estimate                                           |
+|       | **QUARTERLY INDICES (Raw Levels)**                                                                                                                      |          |               |                      |                                                                                                       |
+| Q1    | Business Confidence Index   | Q        | Index         | Raw                  | Survey sentiment leads consumption/investment                                                         |
+| Q2    | Building Confidence Index   | Q        | Index         | Raw                  | Sector-specific construction outlook                                                                  |
+| Q3    | Production Volume           | Q        | %             | Raw                  | Direct GDP component; industrial growth coincident                                                    |
+| Q4    | Industrial Production Index | Q        | 2015=100      | Raw                  | Manufacturing output proxy leading total GDP                                                          |
+
+**Copy entire table above → Excel → Copy → Word = Perfect!**
+
+Sources
