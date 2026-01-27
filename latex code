@@ -13,3 +13,7 @@ The framework effectively bridges South Africa's characteristic 85-day quarterly
 *(298 words)*
 
 Sources
+
+
+South Africa’s quarterly GDP statistics suffer an 85-day publication lag, creating critical blind spots for real-time economic analysis and decision-making. Nowcasting addresses this gap by estimating current-quarter GDP growth using higher-frequency monthly indicators (retail sales, PMI, electricity usage) through purpose-built econometric models. This paper develops a comprehensive nowcasting framework for South African quarterly GDP YoY growth using 19 mixed-frequency indicators spanning 1999Q1–2025Q4.
+The analysis deploys a model suite comprising AR(1,4), ARMA(1,0,2) with ACF/PACF lag selection, Indicator regressions, VAR, MIDAS, 5-factor Dynamic Factor Model, and LASSO specifications, augmented by a 2016Q1 structural dummy. Recursive step-ahead forecasting (1999Q1–2021Q4 training → 2022Q1 forecast; rolling 4-quarter windows) validates real-time performance. A forecast combination, weighted by rolling-window MSEs, delivers superior nowcast accuracy by exploiting complementary model strengths
