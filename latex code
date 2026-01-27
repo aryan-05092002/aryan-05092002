@@ -73,3 +73,5 @@ The PSF identifies optimal window size $w^*$ and cluster size $k^*$ that minimiz
 
 \begin{equation}
 \hat{y}_t = \frac{1}{|ES|} \sum_{j=1}^{|ES|} ES_j
+
+where $ES = \{ y_{s+w} \mid y_{s:s+w-1} \sim y_{t-w:t-1} \}$ contains values following historical sequences matching the current $w$-length pattern.
