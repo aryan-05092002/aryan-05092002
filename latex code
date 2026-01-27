@@ -40,3 +40,6 @@ The empirical strategy employs a model suite comprising autoregressive AR(1,4) b
 **Copy entire table above → Excel → Copy → Word = Perfect!**
 
 Sources
+
+
+\text{RMSE}_{i,t} = \sqrt{\frac{1}{4} \sum_{k=0}^{3} (y_{t-k} - \hat{y}_{i,t-k})^2}
