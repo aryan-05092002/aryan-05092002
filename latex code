@@ -50,3 +50,26 @@ w_{i,t} = \frac{(1/\text{RMSE}_{i,t}^2)}{\sum_{j=1}^{N} (1/\text{RMSE}_{j,t}^2)}
 \end{equation}
 
 \hat{f}_t = \sum_{i=1}^{n} w_{i,t} \hat{y}_{i,t}
+
+
+y_t = \alpha_0 + \alpha_1 y_{t-1} + \alpha_2 y_{t-2} + \alpha_3 y_{t-3} + \alpha_4 y_{t-4} + \epsilon_t
+
+y_t = \alpha y_{t-1} + \theta \epsilon_{t-1} + \epsilon_t
+
+y_t = \beta_0 + \beta_1 y_{t-1} + \sum_{j=1}^{m} \gamma_j \bar{x}_{j,t} + u_t
+
+y_t &= \lambda_0' F_t + \gamma y_{t-1} + u_t \label{eq:dfm_y} \\
+F_t &= A_1 F_{t-1} + B_1 \Lambda_t + v_t \label{eq:dfm_f} \\
+X_t &= \Lambda F_t + e_t \label{eq:dfm_x}
+where $F_t \in \mathbb{R}^5$ are latent factors extracted from $N$ monthly indicators $X_t$.
+
+y_t = \beta_0 + \beta_1 y_{t-1} + \sum_{k=1}^{K} \phi_k(\theta) x_{t-k/3} + u_t
+with Almon lag polynomial $\phi_k(\theta) = \sum_{i=0}^p \alpha_i k^i$.
+
+y_t = \beta_0 + \sum_{j=1}^{p} \beta_j z_{j,t} + u_t \quad \min_{\beta} \sum (y_t - \hat{y}_t)^2 + \lambda \sum |\beta_j|
+
+
+The PSF identifies optimal window size $w^*$ and cluster size $k^*$ that minimize validation error, then forecasts via pattern matching:
+
+\begin{equation}
+\hat{y}_t = \frac{1}{|ES|} \sum_{j=1}^{|ES|} ES_j
