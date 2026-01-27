@@ -1,37 +1,15 @@
-\begin{table}[htbp]
-\centering
-\caption{Nowcasting Indicators -- Transformations and Economic Rationale}
-\label{tab:data_transforms}
-\small
-\begin{tabularx}{\textwidth}{@{}l p{1.2cm} p{1cm} p{2.5cm} X@{}}
-\toprule
-\textbf{\#} & \textbf{Variable} & \textbf{Freq} & \textbf{Units} & \textbf{Transformation} & \textbf{Rationale and Nowcasting Use Case} \\
-\midrule
-\multicolumn{6}{l}{\textbf{\textit{TRENDING FLOWS (Log-Transformed)}}} \\
-1 & Retail Sales & M & Million ZAR & $\log$(Retail) & Stabilizes exponential retail growth while preserving current consumption level signals quarterly household spending \\
-2 & Wholesale Sales & M & Million ZAR & $\log$(Wholesale) & Removes trade flow trend; captures inventory cycles leading business investment \\
-3 & Passenger Vehicle Sales & M & Units & $\log$(Vehicles) & Unit sales compound; durable consumption proxy signals consumer confidence \\
-4 & Credit Extension & M & Million ZAR & $\log$(Credit) & Financial accelerator; log-credit levels track borrowing capacity for investment \\
-5 & Electricity Consumption & M & GWH & $\log$(Consumption) & Real activity proxy; industrial demand coincident with manufacturing GDP \\
-6 & Building Plans Passed & M & 000s ZAR & $\log$(Plans) & Leading construction investment; log-value stabilizes variance \\
-7 & Mining Sales & M & Million ZAR & $\log$(Mining) & Commodity export driver (8\% GDP); terms-of-trade coincident \\
-8 & Electricity Production & M & GWH & $\log$(Production) & Capacity utilization constraint; supply-side industrial activity \\
-9 & Building Plans Completed & M & 000s ZAR & $\log$(Completed) & Construction coincident indicator following plans \\
-10 & M3 Money Supply & M & Million ZAR & $\log$(M3) & Liquidity captures aggregate demand pressure via velocity \\
-\midrule
-\multicolumn{6}{l}{\textbf{\textit{STATIONARY INDICES (Raw Levels)}}} \\
-11 & New Vehicle Sales Index & M & 2019=100 & Raw & Normalized volume index; manufacturing + consumption coincident \\
-12 & Business Cycle Composite Leader & M & 2019=100 & Raw & OECD-style leading composite; cycle turning points \\
-13 & CPI All Items & M & Dec2024=100 & Raw & Price level coincident; preserves inflation pass-through \\
-14 & REER & M & 2015=100 & Raw & Competitiveness level drives trade elasticities \\
-15 & PMI & M & 50+=expansion & Raw & Diffusion index optimal (>50=expansion); flash GDP estimate \\
-\midrule
-\multicolumn{6}{l}{\textbf{\textit{QUARTERLY INDICES (Raw Levels)}}} \\
-Q1 & Business Confidence Index & Q & Index & Raw & Survey sentiment leads consumption/investment \\
-Q2 & Building Confidence Index & Q & Index & Raw & Sector-specific construction outlook \\
-Q3 & Production Volume & Q & \% & Raw & Direct GDP component; industrial growth coincident \\
-Q4 & Industrial Production Index & Q & 2015=100 & Raw & Manufacturing output proxy leading total GDP \\
-\bottomrule
-\multicolumn{5}{r}{\footnotesize \textit{N = 19 predictors (15M + 4Q)}} & \\
-\end{tabularx}
-\end{table}
+**Abstract**
+
+This paper develops a comprehensive nowcasting framework for South African quarterly GDP year-over-year (YoY) growth rates using a mixed-frequency dataset spanning 1999Q1 through 2025Q4. The indicator set includes 19 carefully selected variables: 10 monthly economic flows—retail sales, wholesale sales, passenger vehicle sales, private credit extension, electricity consumption and production, building plans passed and completed, mining sales, and M3 money supply—are log-transformed to achieve stationarity and stabilize exponential trends inherent in nominal flow data. Nine additional stationary monthly indices (New Vehicle Sales Index, Business Cycle Composite Leader, CPI All Items, REER, PMI) and quarterly surveys (Business Confidence, Building Confidence, Production Volume, Industrial Production Index) enter in raw levels, preserving their normalized scale and diffusion properties.
+
+The econometric strategy employs a diverse model suite optimized for nowcasting: AR(1,4) autoregressive benchmarks capture GDP persistence; ARMA(1,0,2) specifications with lags determined via systematic ACF/PACF analysis accommodate serial correlation in stationary GDP differences; pooled Indicator (bridge) regressions leverage monthly data for quarterly targets; VAR models incorporate dynamic interrelationships; MIDAS regressions handle mixed frequencies; a 5-factor Dynamic Factor Model extracts common cycles; and LASSO regularization addresses multicollinearity among correlated predictors. A binary dummy variable (=1 from 2016Q1 onward) controls for structural economic shifts observed in the post-global financial crisis period.
+
+Models undergo rigorous step-ahead forecasting validation through recursive estimation: initial training on 1999Q1–2021Q4 generates the 2022Q1 forecast, with subsequent rounds expanding the training sample by one quarter using 4-quarter rolling windows. This recursive approach mimics real-time nowcasting conditions, ensuring vintage data consistency and out-of-sample reliability.
+
+The principal innovation—a forecast combination methodically weighted by inverse mean squared errors (MSE_it) from rolling-window performance—aggregates individual model predictions into a single, robust nowcast. This ensemble approach systematically outperforms constituent models by exploiting complementary strengths and mitigating individual biases, delivering superior real-time tracking of South African GDP growth.
+
+The framework effectively bridges South Africa's characteristic 85-day quarterly GDP publication lag, providing policymakers, analysts, and market participants with timely, high-frequency insights into current economic conditions and near-term growth trajectories.
+
+*(298 words)*
+
+Sources
