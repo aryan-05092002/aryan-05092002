@@ -48,3 +48,5 @@ Sources
 w_{i,t} = \frac{(1/\text{RMSE}_{i,t}^2)}{\sum_{j=1}^{N} (1/\text{RMSE}_{j,t}^2)} = \frac{\text{MSE}_{i,t}^{-1}}{\sum_{j=1}^{N} \text{MSE}_{j,t}^{-1}}
 \label{eq:inv_mse_weights}
 \end{equation}
+
+\hat{f}_t = \sum_{i=1}^{n} w_{i,t} \hat{y}_{i,t}
