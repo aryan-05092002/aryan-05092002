@@ -43,3 +43,8 @@ Sources
 
 
 \text{RMSE}_{i,t} = \sqrt{\frac{1}{4} \sum_{k=0}^{3} (y_{t-k} - \hat{y}_{i,t-k})^2}
+
+\begin{equation}
+w_{i,t} = \frac{(1/\text{RMSE}_{i,t}^2)}{\sum_{j=1}^{N} (1/\text{RMSE}_{j,t}^2)} = \frac{\text{MSE}_{i,t}^{-1}}{\sum_{j=1}^{N} \text{MSE}_{j,t}^{-1}}
+\label{eq:inv_mse_weights}
+\end{equation}
