@@ -154,3 +154,104 @@ results_df = pd.DataFrame({
 
 print(results_df)
 
+
+
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.seasonal import STL
+
+# ==========================================
+# 1. LOAD DATA & PARSE DATES (Crucial Step)
+# ==========================================
+
+# Replace 'your_data.csv' with your actual file name
+# We assume your columns are named roughly like this: 'Date' and 'MoM_Rate'
+try:
+    df = pd.read_csv('your_data.csv')
+except FileNotFoundError:
+    # CREATING MOCK DATA FOR DEMONSTRATION (If no file exists)
+    dates = pd.date_range(start='01-2018', periods=60, freq='MS')
+    df = pd.DataFrame({
+        'Date': dates.strftime('%m-%Y'), # Simulating your "mm-yyyy" format
+        'MoM_Rate': np.random.normal(0.5, 0.2, 60) + [0.5 if i%12==0 else 0 for i in range(60)]
+    })
+    print("⚠️ No CSV found. Using generated mock data for demonstration.\n")
+
+# --- DATE PARSING LOGIC ---
+# This converts "01-2023" (mm-yyyy) into a real Datetime object
+df['Date'] = pd.to_datetime(df['Date'], format='%m-%Y')
+
+# Set Date as index and force it to 'Month Start' frequency
+# This stops STL from complaining about missing period information
+df.set_index('Date', inplace=True)
+df = df.asfreq('MS') 
+
+# Handle any missing data that might appear after setting frequency
+# (Linear interpolation is standard for small gaps in economic data)
+df['MoM_Rate'] = df['MoM_Rate'].interpolate(method='linear')
+
+# ==========================================
+# 2. RECONSTRUCT THE INDEX (Base 100)
+# ==========================================
+# We need a continuous index to adjust, not just rates.
+
+# Convert MoM % to a multiplier (e.g., 0.5% -> 1.005)
+df['Multiplier'] = 1 + (df['MoM_Rate'] / 100)
+
+# Chain the multipliers to build the index starting at 100
+df['Synthetic_Index'] = 100 * df['Multiplier'].cumprod()
+
+# ==========================================
+# 3. RUN STL (Log-Additive Method)
+# ==========================================
+# We take Log because Inflation is Multiplicative (Percentage-based).
+# STL is Additive. Log transforms Multiplicative -> Additive.
+
+# A. Log Transform
+log_index = np.log(df['Synthetic_Index'])
+
+# B. Run STL Decomposition
+# period=12 is implicit because we set freq='MS', but we define it to be safe.
+# seasonal=13 is the robust standard.
+stl = STL(log_index, period=12, seasonal=13, robust=True).fit()
+
+# C. Remove Seasonality
+# We subtract the seasonal component from the Log Index
+df['Log_SA_Index'] = log_index - stl.seasonal
+
+# D. Reverse Log (Exponentiate) to get real values
+df['SA_Index'] = np.exp(df['Log_SA_Index'])
+
+# ==========================================
+# 4. CALCULATE FINAL SA RATES
+# ==========================================
+
+# SA Month-over-Month (%)
+df['SA_MoM'] = df['SA_Index'].pct_change() * 100
+
+# SA Year-over-Year (%)
+df['SA_YoY'] = df['SA_Index'].pct_change(periods=12) * 100
+
+# ==========================================
+# 5. EXPORT & VISUALIZE
+# ==========================================
+
+# Save to CSV
+output_filename = "seasonally_adjusted_inflation.csv"
+df[['MoM_Rate', 'SA_MoM', 'SA_YoY']].to_csv(output_filename)
+print(f"✅ Success! Data saved to {output_filename}")
+
+# Display last 5 months
+print("\n--- Recent Adjusted Data ---")
+print(df[['MoM_Rate', 'SA_MoM', 'SA_YoY']].tail())
+
+# Plotting
+plt.figure(figsize=(12, 6))
+plt.plot(df.index, df['MoM_Rate'], label='Original MoM', color='lightgray', linestyle='--')
+plt.plot(df.index, df['SA_MoM'], label='Seasonally Adjusted MoM', color='blue', linewidth=2)
+plt.title('Inflation: Original vs Seasonally Adjusted (STL Method)')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
