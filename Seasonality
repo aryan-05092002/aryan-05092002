@@ -255,3 +255,86 @@ plt.title('Inflation: Original vs Seasonally Adjusted (STL Method)')
 plt.legend()
 plt.grid(True, alpha=0.3)
 plt.show()
+
+
+
+
+
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+
+# ==========================================
+# 1. SETUP (Load your data)
+# ==========================================
+# Assuming 'df' has your "MoM_Rate" and a Datetime Index
+# For this example, I'll generate the same mock data as before
+dates = pd.date_range(start='01-2018', periods=60, freq='MS')
+df = pd.DataFrame({'MoM_Rate': np.random.normal(0.5, 0.2, 60) + [0.5 if i%12==0 else 0 for i in range(60)]}, index=dates)
+
+# RECONSTRUCT INDEX (Base 100)
+df['Multiplier'] = 1 + (df['MoM_Rate'] / 100)
+df['Synthetic_Index'] = 100 * df['Multiplier'].cumprod()
+
+# Log Transform (Crucial for Inflation)
+df['Log_Index'] = np.log(df['Synthetic_Index'])
+
+# ==========================================
+# 2. RUN UCM (Unobserved Components Model)
+# ==========================================
+# We define the components we want:
+# - level='local linear trend': Allows the trend to bend up and down.
+# - seasonal=12: Captures the monthly seasonality.
+# - cycle=True: OPTIONAL. Isolates business cycles (booms/busts) separate from the trend.
+
+model = sm.tsa.UnobservedComponents(
+    df['Log_Index'],
+    level='local linear trend',
+    seasonal=12,
+    # cycle=True,  # Uncomment this if you want to isolate business cycles too
+    irregular=True
+)
+
+# Fit the model (The Kalman Filter works its magic here)
+result = model.fit()
+
+# ==========================================
+# 3. EXTRACT RESULTS
+# ==========================================
+# UCM stores the "Seasonal" component in the results wrapper
+
+# Get the seasonal component (in Log scale)
+log_seasonal_component = result.seasonal.smoothed
+
+# Remove seasonality: Log Index - Log Seasonal
+df['Log_SA_Index'] = df['Log_Index'] - log_seasonal_component
+
+# Exponentiate back to real values
+df['SA_Index'] = np.exp(df['Log_SA_Index'])
+
+# Calculate Final SA Rates
+df['SA_MoM'] = df['SA_Index'].pct_change() * 100
+
+# ==========================================
+# 4. VIEW & PLOT
+# ==========================================
+print(result.summary()) # Shows you statistical significance of seasonality!
+
+plt.figure(figsize=(12, 8))
+
+# Plot 1: The SA Rate
+plt.subplot(2, 1, 1)
+plt.plot(df.index, df['MoM_Rate'], label='Original MoM', alpha=0.5)
+plt.plot(df.index, df['SA_MoM'], label='UCM Adjusted MoM', color='red', linewidth=2)
+plt.legend()
+plt.title('Inflation Adjusted via UCM (State Space)')
+
+# Plot 2: The Components
+plt.subplot(2, 1, 2)
+plt.plot(df.index, np.exp(result.trend.smoothed), label='Trend (Core Inflation)', color='green')
+plt.title('Underlying Trend (Core Inflation Direction)')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
