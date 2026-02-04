@@ -433,3 +433,89 @@ plt.plot(final_df.index, final_df['Food_SA'], label='Food (SA)', linewidth=2)
 plt.title("Bulk Adjustment Example: Food Category")
 plt.legend()
 plt.show()
+
+
+
+
+
+
+import pandas as pd
+
+# ---------------------------------------------------------
+# SETUP: Assuming your DataFrame 'df' has a DateTime Index
+# ---------------------------------------------------------
+# Ensure the index is actually in datetime format for the math to work
+df.index = pd.to_datetime(df.index)
+
+# 1. Calculate High Water Mark and Drawdown Curves
+df['High_Water_Mark'] = df['Cum_PnL'].cummax()
+df['Drawdown'] = df['Cum_PnL'] - df['High_Water_Mark']
+
+# ---------------------------------------------------------
+# THE DRAWDOWN ANALYZER (Index-Based)
+# ---------------------------------------------------------
+drawdown_periods = []
+in_drawdown = False
+peak_date = df.index[0] # Initialize with the first date in the index
+max_loss = 0
+
+# iterrows() returns the index (Date) as the first item
+for current_date, row in df.iterrows():
+    
+    # Case 1: We are currently in a Drawdown (Negative Value)
+    if row['Drawdown'] < 0:
+        if not in_drawdown:
+            # We just started falling. 
+            # The Peak Date is the *last* date we saw before this loop started falling.
+            # (which is currently stored in 'peak_date')
+            in_drawdown = True
+            max_loss = row['Drawdown']
+        else:
+            # We are already falling. Is this a new "Deepest Point"?
+            if row['Drawdown'] < max_loss:
+                max_loss = row['Drawdown']
+    
+    # Case 2: We are at a High (Drawdown is 0)
+    elif row['Drawdown'] == 0:
+        if in_drawdown:
+            # We were falling, but now we are back to 0. The period is over.
+            recovery_date = current_date
+            duration = (recovery_date - peak_date).days
+            
+            drawdown_periods.append({
+                'Peak Date': peak_date,
+                'Recovery Date': recovery_date,
+                'Max Drawdown ($)': max_loss,
+                'Duration (Days)': duration
+            })
+            
+            # Reset flags
+            in_drawdown = False
+            max_loss = 0
+        
+        # IMPORTANT: Since Drawdown is 0, today is a potential new Peak.
+        # We update peak_date to today so that if we fall tomorrow, 
+        # the start of the fall is marked as today.
+        peak_date = current_date
+
+# Case 3: Handle the scenario where the data ends while still in a drawdown
+if in_drawdown:
+    drawdown_periods.append({
+        'Peak Date': peak_date,
+        'Recovery Date': 'Not Recovered',
+        'Max Drawdown ($)': max_loss,
+        'Duration (Days)': (df.index[-1] - peak_date).days
+    })
+
+# ---------------------------------------------------------
+# CREATE THE REPORT
+# ---------------------------------------------------------
+dd_report = pd.DataFrame(drawdown_periods)
+
+# Sort by Max Drawdown (Ascending) to see the biggest losses at the top
+if not dd_report.empty:
+    dd_report = dd_report.sort_values(by='Max Drawdown ($)', ascending=True)
+
+print("--- DRAWDOWN PERIODS REPORT ---")
+print(dd_report)
+
