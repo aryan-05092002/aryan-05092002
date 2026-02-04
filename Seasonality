@@ -338,3 +338,98 @@ plt.legend()
 
 plt.tight_layout()
 plt.show()
+
+
+
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.seasonal import STL
+
+# ==========================================
+# 1. DEFINE THE CORE FUNCTION
+# ==========================================
+def get_sa_mom(mom_series, seasonal_window=13):
+    """
+    Takes a Series of MoM inflation rates, runs Log-STL, 
+    and returns the Seasonally Adjusted MoM rates.
+    """
+    # A. Clean Data (Handle missing values or gaps)
+    # We use linear interpolation to prevent STL crashes
+    clean_series = mom_series.interpolate(method='linear')
+    
+    # B. Reconstruct Index (Base 100)
+    multiplier = 1 + (clean_series / 100)
+    synthetic_index = 100 * multiplier.cumprod()
+    
+    # C. Log Transform (Multiplicative Adjustment)
+    log_index = np.log(synthetic_index)
+    
+    # D. Run STL
+    # period=12 is standard for monthly data
+    stl = STL(log_index, period=12, seasonal=seasonal_window, robust=True).fit()
+    
+    # E. Remove Seasonality & Reverse Log
+    log_sa_index = log_index - stl.seasonal
+    sa_index = np.exp(log_sa_index)
+    
+    # F. Calculate SA MoM Rate
+    sa_mom = sa_index.pct_change() * 100
+    
+    return sa_mom
+
+# ==========================================
+# 2. LOAD & PREPARE DATA
+# ==========================================
+
+# MOCK DATA GENERATION (Replace this block with pd.read_csv)
+dates = pd.date_range(start='01-2018', periods=60, freq='MS')
+data = {
+    'Food': np.random.normal(0.8, 0.3, 60) + [1.0 if i%12==0 else 0 for i in range(60)], # Jan spikes
+    'Energy': np.random.normal(0.5, 1.0, 60) + [1.5 if i%12==6 else 0 for i in range(60)], # July spikes
+    'Housing': np.random.normal(0.2, 0.1, 60) # Stable
+}
+df = pd.DataFrame(data, index=dates)
+
+# ==========================================
+# 3. THE BULK PROCESSING LOOP
+# ==========================================
+
+# Create a container for the new adjusted data
+df_sa = pd.DataFrame(index=df.index)
+
+print("Starting Seasonal Adjustment...")
+
+# Loop through every column in your original dataframe
+for category in df.columns:
+    print(f"Processing: {category}")
+    
+    # Apply the function to the column
+    sa_series = get_sa_mom(df[category])
+    
+    # Store it in the new dataframe with a suffix
+    df_sa[f"{category}_SA"] = sa_series
+
+print("\n✅ Done! All categories adjusted.")
+
+# ==========================================
+# 4. EXPORT & COMPARE
+# ==========================================
+
+# Merge original and SA data for easy comparison
+final_df = pd.concat([df, df_sa], axis=1)
+
+# Save to CSV
+final_df.to_csv("All_Categories_Adjusted.csv")
+
+# Quick Check: Compare Food Raw vs Food SA
+print(final_df[['Food', 'Food_SA']].tail())
+
+# Visualization
+plt.figure(figsize=(10, 5))
+plt.plot(final_df.index, final_df['Food'], label='Food (Raw)', alpha=0.5)
+plt.plot(final_df.index, final_df['Food_SA'], label='Food (SA)', linewidth=2)
+plt.title("Bulk Adjustment Example: Food Category")
+plt.legend()
+plt.show()
