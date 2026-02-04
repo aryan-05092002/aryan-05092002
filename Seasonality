@@ -519,3 +519,102 @@ if not dd_report.empty:
 print("--- DRAWDOWN PERIODS REPORT ---")
 print(dd_report)
 
+
+
+
+
+import pandas as pd
+
+# ---------------------------------------------------------
+# SETUP: Assuming your DataFrame 'df' has a DateTime Index
+# ---------------------------------------------------------
+# Ensure index is datetime
+df.index = pd.to_datetime(df.index)
+
+# 1. Calculate High Water Mark and Drawdown Curves
+df['High_Water_Mark'] = df['Cum_PnL'].cummax()
+df['Drawdown'] = df['Cum_PnL'] - df['High_Water_Mark']
+
+# ---------------------------------------------------------
+# THE PEAK-TO-VALLEY ANALYZER
+# ---------------------------------------------------------
+drawdown_periods = []
+in_drawdown = False
+peak_date = df.index[0]
+
+# Temporary storage for the current underwater cycle
+current_cycle_data = []
+
+for current_date, row in df.iterrows():
+    
+    # Check if we are underwater (Drawdown < 0)
+    if row['Drawdown'] < 0:
+        if not in_drawdown:
+            # START OF DROP: We just fell from a Peak
+            in_drawdown = True
+            # The Peak was arguably the previous day (or today if it started today)
+            # We keep track of the cycle starting now
+        
+        # Collect data for this underwater cycle
+        current_cycle_data.append({
+            'Date': current_date,
+            'Drawdown': row['Drawdown']
+        })
+    
+    # Check if we recovered (Drawdown == 0)
+    elif row['Drawdown'] == 0:
+        if in_drawdown:
+            # CYCLE OVER: We have recovered.
+            # NOW, we apply your rule: Find the "Trough" (Lowest Point)
+            
+            # Create a temporary dataframe for this specific bad period
+            cycle_df = pd.DataFrame(current_cycle_data)
+            
+            if not cycle_df.empty:
+                # Find the row with the deepest loss
+                trough_row = cycle_df.loc[cycle_df['Drawdown'].idxmin()]
+                
+                trough_date = trough_row['Date']
+                max_loss = trough_row['Drawdown']
+                
+                # Duration is now Peak -> Trough (ignoring recovery time)
+                duration = (trough_date - peak_date).days
+                
+                drawdown_periods.append({
+                    'Peak Date': peak_date,
+                    'Trough Date': trough_date, # The day the bleeding stopped
+                    'Max Drawdown ($)': max_loss,
+                    'Decline Duration (Days)': duration
+                })
+            
+            # Reset flags
+            in_drawdown = False
+            current_cycle_data = []
+            
+        # Update Peak Date to today (new High Water Mark)
+        peak_date = current_date
+
+# Handle case where data ends while still underwater
+if in_drawdown and current_cycle_data:
+    cycle_df = pd.DataFrame(current_cycle_data)
+    trough_row = cycle_df.loc[cycle_df['Drawdown'].idxmin()]
+    
+    drawdown_periods.append({
+        'Peak Date': peak_date,
+        'Trough Date': trough_row['Date'],
+        'Max Drawdown ($)': trough_row['Drawdown'],
+        'Decline Duration (Days)': (trough_row['Date'] - peak_date).days
+    })
+
+# ---------------------------------------------------------
+# CREATE THE REPORT
+# ---------------------------------------------------------
+dd_report = pd.DataFrame(drawdown_periods)
+
+if not dd_report.empty:
+    dd_report = dd_report.sort_values(by='Max Drawdown ($)', ascending=True)
+
+print("--- PEAK TO TROUGH REPORT (Decline Phase Only) ---")
+print(dd_report)
+
+
