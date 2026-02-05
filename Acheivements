@@ -10,3 +10,14 @@ max_lag = 4  # maximum lag to create
 for lag in range(1, max_lag + 1):
     qpc_data1[f'gdp_lag{lag}'] = qpc_data1['REAL_GDP_QPC'].shift(lag)
 
+
+
+In January, I led several high-impact projects aligned with macroeconomic analysis and quantitative modeling:
+Terms of Trade Matrix for EEMEA Countries  
+Developed a comprehensive Terms of Trade exposure matrix for Emerging Europe, Middle East, and Africa (EEMEA) countries. This tool quantifies trade balance vulnerability (as % of GDP) to key volatile commodities, including oil, copper, gold, and silver, enabling enhanced risk assessment across emerging markets.
+South Africa GDP Nowcasting Model  
+Built and implemented a multi-model nowcasting framework to forecast South African quarterly GDP growth. The suite integrated Autoregressive (AR), ARIMA, Indicator, Pattern Sequence Forecasting, LASSO, Dynamic Factor Models (DFM), Vector Autoregression (VAR), and Mixed Data Sampling (MIDAS) approaches. Model performance was evaluated via 4-quarter rolling window Root Mean Square Error (RMSE), culminating in an optimal forecast combination using inverse-RMSE weights that dynamically adjust based on recent accuracy. Currently drafting a publication-ready report, including technical appendix, data transformations, model equations, and validation parameters.
+Complex AI Index Development  
+Collaborated with an analyst to construct a sophisticated AI Impact Index, incorporating short- and long-run parameters to evaluate AI’s effects on productivity and economic growth across countries.
+Strategic Regimes for Czech Republic Front-End Rates  
+Analyzed strategic regimes for 1-year swap rates (1Y swaps) in the Czech Republic, testing interlinkages with interbank rates, policy rates, and Forward Rate Agreements (FRAs). Calculated cumulative profits under each regime to identify optimal dynamics; model slated for extension to 2Y swaps, 1Y1Y tenors, and broader EEMEA coverage.
