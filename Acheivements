@@ -14,3 +14,36 @@ for lag in range(1, max_lag + 1):
 Econometric Model Expertise: Extensively utilized Spark Assist to master role-critical econometric models, gaining simplified explanations of complex mathematical equations and tailored guidance on variable transformations for optimal model fit.
 •	Python and Backtesting Proficiency: Enhanced Python coding skills through AI-driven insights, enabling development of sophisticated backtesting frameworks for robust model training and validation.
 •	Task Automation: Streamlined repetitive workflows by leveraging AI to efficiently extract, interpret, and tabulate key data points from diverse websites, minimizing manual effort.
+
+
+Hi Mai,
+
+I noticed an issue in the Scorecard 3 calculation, where the two IMF parameters receive half weights and the two Median/Demographic Dividend parameters also receive half weights.
+
+Dividing their respective composite z-scores by 2 before averaging all five metrics assigns each an equal \( \frac{1}{5} \) share via the average function. However, this yields:
+\[
+\text{Scorecard 3} = \frac{1}{5} z_1 + \frac{1}{5} \cdot \frac{1}{2} (z_2 + z_3 + z_4 + z_5) = \frac{z_1}{5} + \frac{z_2 + z_3 + z_4 + z_5}{10},
+\]
+where the effective coefficients sum to \( \frac{3}{5} \neq 1 \).[1][2]
+
+Ideally, apply raw weights \( w = [1, 0.5, 0.5, 0.5, 0.5] \) (sum = 3), then normalize by dividing the weighted sum by 3:
+\[
+\text{Scorecard 3} = \frac{1 \cdot z_1 + 0.5 \cdot (z_2 + z_3 + z_4 + z_5)}{3}.
+\]
+This ensures coefficients sum to 1, preserving z-score scale.[3][4]
+
+## Corrected Excel/Python
+**Excel**: `=(z1 + 0.5*(z2+z3+z4+z5))/3`
+
+**Python**:
+```python
+weights = np.array([1.0, 0.5, 0.5, 0.5, 0.5])
+scorecard3 = np.average(z_scores, weights=weights)  # Auto-normalizes
+```
+Please update and verify.
+
+Sources
+[1] But suppose i want to take the average of modified z scores of four different metrics, but if one of them is blank then would I get good average? https://www.perplexity.ai/search/bb5b42a3-61dc-48c4-9f17-c219c088579d
+[2] Weighted arithmetic mean https://en.wikipedia.org/wiki/Weighted_arithmetic_mean
+[3] Use Stl function https://www.perplexity.ai/search/128ca279-3517-4c06-9d75-3583d1dd2379
+[4] Weighted Average: Formula & Calculation Examples https://statisticsbyjim.com/basics/weighted-average/
