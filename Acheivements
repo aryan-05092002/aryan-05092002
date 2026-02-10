@@ -22,4 +22,19 @@ This metric evaluates labor market alignment with the AI frontier by benchmarkin
 IMF Skill Readiness Index
 This metric assesses the workforce's adaptability to AI, drawing primarily from the Human Capital pillar of the IMF AI Preparedness Index. It aggregates critical indicators such as years of schooling, digital skills availability, and active labor market policies to determine if a population can complement new technologies rather than be displaced by them. This is vital for the index as it benchmarks the talent pipeline required to prevent skills bottlenecks and ensure sustainable AI integration.
 
-
+Microsoft AI Diffusion Speed
+This metric benchmarks technological velocity across 147 economies by tracking the active working-age population currently utilizing generative AI. By normalizing user telemetry for internet and device access, it reveals how quickly nations are integrating AI compared to historical innovations. This is essential for the index to highlight global disparities in digital adoption and workforce productivity readiness.
+Eurostat EU Enterprises Using AI Diffusion Rate
+Focusing on the 27 EU Member States, this metric assesses industrial maturity by calculating the percentage of enterprises employing AI technologies like robotics and machine learning. It is critical for the index as it exposes the "digital divide" within the European bloc, quantifying how deeply different sectors are transitioning from experimental pilots to value-generating systemic integration.
+IMD WDCR - Knowledge Score
+Derived from the IMD World Digital Competitiveness Ranking of 67 leading economies, this score evaluates the intangible infrastructure—such as scientific concentration and education—required for discovery. It is vital for the index to measure a nation’s foundational capacity to understand and build new technologies, ensuring the human capital ecosystem can sustain long-term AI development.
+IMD WDCR - Future Readiness (Readiness Score)
+Also spanning 67 major economies, this metric gauges the operational flexibility needed for digital transformation. By aggregating indicators on business agility and adaptive attitudes, it assesses how effectively a society adopts disruptive technologies. This provides the index with a crucial measure of cultural and commercial resilience, highlighting markets best positioned to pivot and scale AI solutions.
+Median Age
+Covering over 190 nations globally, this demographic proxy balances labor supply against dependency ratios to determine workforce automation potential. A higher median age signals a shrinking workforce, creating an urgent economic imperative to adopt AI. Including this metric distinguishes between countries driving AI adoption through innovation versus those compelled by structural labor shortages.
+Demographic Dividend - EBRD Economy
+Contextualizing growth potential across approximately 40 transition economies, this metric analyzes shifts in population age structures to assess labor market vitality. It is essential for determining whether these specific regions possess the youth workforce to drive digital innovation or face demographic headwinds. This reveals if AI adoption is being fueled by talent abundance or productivity necessity.
+IMF Skill Imbalance Index (vs US)
+Benchmarking selected advanced and emerging economies against the US labor market, this index identifies structural mismatches between skill supply and AI demand. It is vital for distinguishing nations with genuine talent shortages from those with innovation gaps. This allows the index to pinpoint specific policy interventions required to align the local workforce with the global AI frontier.
+IMF Skill Readiness Index
+This metric evaluates the workforce adaptability of 174 economies by aggregating human capital indicators like years of schooling and digital literacy. It is crucial for the index to determine if a population can complement new technologies rather than face displacement. This establishes a baseline for the talent pipeline required to prevent bottlenecks and ensure sustainable AI integration
