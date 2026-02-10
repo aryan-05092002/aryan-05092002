@@ -43,3 +43,6 @@ This metric evaluates the workforce adaptability of 174 economies by aggregating
 Eurostat EU Enterprises Using AI Diffusion Speed
 Coverage: 27 EU Member States
 Across the 27 EU Member States, this metric tracks the velocity of AI uptake, measuring the year-on-year growth rate (in percentage points) of enterprises adopting AI technologies. Unlike the static diffusion rate, this "speed" indicator reveals the momentum of digital transformation, highlighting how rapidly industries are overcoming adoption barriers. It is essential for distinguishing between markets with stagnant mature usage and those experiencing an explosive, innovation-driven acceleration.
+
+This composite metric evaluates the infrastructure stability required for AI scaling, aggregating four key indicators: Electricity Generation (30%), Low Carbon Share (10%), Net Energy Import (30%), and Transmission Losses (30%). By utilizing a Min-Max normalization approach, it standardizes diverse energy data into a 0-100 scale, allowing for direct comparison of how reliably and cleanly different economies can power data centers. This is vital for assessing the physical capacity constraints that could bottleneck high-compute AI operations.
+
