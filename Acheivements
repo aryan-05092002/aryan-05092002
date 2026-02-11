@@ -44,5 +44,35 @@ Eurostat EU Enterprises Using AI Diffusion Speed
 Coverage: 27 EU Member States
 Across the 27 EU Member States, this metric tracks the velocity of AI uptake, measuring the year-on-year growth rate (in percentage points) of enterprises adopting AI technologies. Unlike the static diffusion rate, this "speed" indicator reveals the momentum of digital transformation, highlighting how rapidly industries are overcoming adoption barriers. It is essential for distinguishing between markets with stagnant mature usage and those experiencing an explosive, innovation-driven acceleration.
 
-This composite metric evaluates the infrastructure stability required for AI scaling, aggregating four key indicators: Electricity Generation (30%), Low Carbon Share (10%), Net Energy Import (30%), and Transmission Losses (30%). By utilizing a Min-Max normalization approach, it standardizes diverse energy data into a 0-100 scale, allowing for direct comparison of how reliably and cleanly different economies can power data centers. This is vital for assessing the physical capacity constraints that could bottleneck high-compute AI operations.
+This composite metric evaluates the infrastructure stability required for AI scaling, aggregating four key indicators: Electricity Generation (30%), Low Carbon Share (10%), Net Energy Import (30%), and Transmission Losses (30%). By utilizing a Min-Max normalization approach, it standardizes diverse energy data into a 0-100 scale, allowing for direct comparison of how reliably and cleanly different economies can power data centers. This is vital for assessing the physical capacity constraints that could bottleneck high-compute
+
+AI operations.
+
+import pandas as pd
+
+# 1. Create sample dataframes (replace these with your actual data)
+df1 = pd.DataFrame({'A': [1, 2, 3], 'B': [4, 5, 6]})
+df2 = pd.DataFrame({'C': ['x', 'y'], 'D': ['z', 'w']})
+df3 = pd.DataFrame({'E': [10, 20, 30, 40], 'F': [50, 60, 70, 80]})
+
+all_dfs = [df1, df2, df3]
+
+# 2. Define the output filename and gap size
+filename = 'combined_data.xlsx'
+row_gap = 5
+
+# 3. Write to Excel
+with pd.ExcelWriter(filename, engine='openpyxl') as writer:
+    current_row = 0
+    
+    for df in all_dfs:
+        # Write the dataframe to the sheet at the current_row
+        df.to_excel(writer, sheet_name='Sheet1', startrow=current_row, index=False)
+        
+        # Calculate the next startrow:
+        # current row + number of data rows + 1 row for header + gap
+        current_row += len(df) + 1 + row_gap
+
+print(f"Successfully saved dataframes to {filename} with a {row_gap}-row gap.")
+
 
