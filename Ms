@@ -1,0 +1,99 @@
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+from statsmodels.tsa.stattools import adfuller
+
+# ==========================================
+# CONFIGURATION
+# ==========================================
+# Load your dataset here
+# df = pd.read_csv('your_dataset.csv', index_col='Date', parse_dates=True)
+
+# Define your original target variable name (e.g., 'Log_IV')
+original_target_name = 'Log_IV' 
+
+# Set your strictness for dropping variables in Step 2 (0.10 = 90% confidence)
+p_val_threshold = 0.10  
+
+# ==========================================
+# STEP 1: STATIONARITY PURGE (ADF TEST)
+# ==========================================
+print("--- STEP 1: AUTOMATED STATIONARITY CHECK ---")
+
+def make_stationary(series, signif=0.05):
+    """Checks ADF p-value. Returns stationary series (levels or 1st difference)."""
+    # Drop NaNs just for the test calculation
+    clean_series = series.dropna()
+    p_val = adfuller(clean_series, autolag='AIC')[1]
+    
+    if p_val < signif:
+        print(f"[I(0)] {series.name: <20} | Kept in levels (p-val: {p_val:.4f})")
+        return series
+    else:
+        diff_series = series.diff()
+        diff_p_val = adfuller(diff_series.dropna(), autolag='AIC')[1]
+        new_name = f"Delta_{series.name}"
+        diff_series.name = new_name
+        print(f"[I(1)] {series.name: <20} | Differenced -> {new_name} (p-val: {diff_p_val:.4f})")
+        return diff_series
+
+# Create a new dataframe to hold the purely stationary data
+stationary_data = pd.DataFrame(index=df.index)
+
+# Loop through all columns and apply the transformation
+for col in df.columns:
+    stationary_data[col] = make_stationary(df[col])
+
+# Drop the first row (which became NaN due to any differencing)
+stationary_data.dropna(inplace=True)
+
+# Identify the new name of your target variable (in case it got differenced)
+stationary_target_name = original_target_name
+if f"Delta_{original_target_name}" in stationary_data.columns:
+    stationary_target_name = f"Delta_{original_target_name}"
+
+# ==========================================
+# STEP 2: BASELINE ARX FILTER & PRUNING
+# ==========================================
+print("\n--- STEP 2: BASELINE ARX FILTER ---")
+
+# 1. Create the AR(1) lag for the target variable
+stationary_data['Target_Lag1'] = stationary_data[stationary_target_name].shift(1)
+
+# Drop the new NaN created by shifting
+stationary_data.dropna(inplace=True)
+
+# 2. Define Endogenous (Y) and Exogenous (X) variables
+Y = stationary_data[stationary_target_name]
+
+# X includes the AR(1) term AND all other exogenous variables
+X_raw = stationary_data.drop(columns=[stationary_target_name])
+X_raw = sm.add_constant(X_raw)
+
+# 3. Run the Baseline OLS Model (using HAC robust standard errors)
+baseline_model = sm.OLS(Y, X_raw).fit(cov_type='HAC', cov_kwds={'maxlags': 1})
+
+# ==========================================
+# STEP 2.5: AUTOMATIC PRUNING
+# ==========================================
+print("\n--- STEP 2.5: AUTOMATED PRUNING RESULTS ---")
+
+# Extract the p-values from the baseline model
+p_values = baseline_model.pvalues
+
+# Find variables that failed the test (p-value > threshold), excluding the constant
+insignificant_vars = p_values[(p_values > p_val_threshold) & (p_values.index != 'const')].index.tolist()
+
+if insignificant_vars:
+    print(f"Dropping the following insignificant variables (p > {p_val_threshold}):")
+    for var in insignificant_vars:
+        print(f" ❌ {var} (p-val: {p_values[var]:.4f})")
+else:
+    print(f"✅ All variables passed the significance threshold (p < {p_val_threshold}). Nothing dropped.")
+
+# Drop the dead weight from our X matrix
+X_final = X_raw.drop(columns=insignificant_vars)
+
+print("\n=== FINAL VARIABLES READY FOR MARKOV SWITCHING ===")
+print("Target (Y):", Y.name)
+print("Features (X):", X_final.columns.tolist())
