@@ -214,3 +214,55 @@ print("\n--- RESULTS ---")
 print(f"Optimal Lags according to AIC: {optimal_lag_aic}")
 print(f"Optimal Lags according to BIC: {optimal_lag_bic}")
 
+
+
+
+
+# ==========================================
+# STEP 1: STATIONARITY PURGE (ADF TEST)
+# ==========================================
+print("--- STEP 1: AUTOMATED STATIONARITY CHECK ---")
+
+def make_stationary(series, signif=0.05):
+    """Checks ADF p-value. Returns stationary series (levels or 1st difference)."""
+    # Drop NaNs just for the test calculation
+    clean_series = series.dropna()
+    p_val = adfuller(clean_series, autolag='AIC')[1]
+    
+    if p_val < signif:
+        print(f"[I(0)] {series.name: <20} | Kept in levels (p-val: {p_val:.4f})")
+        return series
+    else:
+        diff_series = series.diff()
+        diff_p_val = adfuller(diff_series.dropna(), autolag='AIC')[1]
+        
+        # Create new name and assign it to the series
+        new_name = f"Delta_{series.name}"
+        diff_series.name = new_name
+        
+        print(f"[I(1)] {series.name: <20} | Differenced -> {new_name} (p-val: {diff_p_val:.4f})")
+        return diff_series
+
+# --- THE FIX IS HERE ---
+# Use a dictionary to store the series so Pandas respects the new names
+transformed_series_dict = {}
+
+# Loop through all columns and apply the transformation
+for col in df.columns:
+    transformed_col = make_stationary(df[col])
+    # Use the actual name of the transformed series as the dictionary key
+    transformed_series_dict[transformed_col.name] = transformed_col
+
+# Build the DataFrame from the dictionary
+stationary_data = pd.DataFrame(transformed_series_dict)
+
+# Drop the first row (which became NaN due to any differencing)
+stationary_data.dropna(inplace=True)
+
+# Identify the new name of your target variable
+stationary_target_name = original_target_name
+if f"Delta_{original_target_name}" in stationary_data.columns:
+    stationary_target_name = f"Delta_{original_target_name}"
+
+print(f"\nTarget variable mapped to: {stationary_target_name}")
+
