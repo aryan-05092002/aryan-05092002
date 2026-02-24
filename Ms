@@ -170,3 +170,47 @@ axes[1].grid(True, alpha=0.2)
 plt.tight_layout()
 plt.show()
 
+
+
+
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+from statsmodels.tsa.ar_model import AutoReg
+
+# Assuming 'Y' is your stationary target variable from Step 1 
+# (e.g., Y = stationary_data['Delta_Log_IV'])
+
+print("--- FINDING OPTIMAL AR LAGS ---")
+
+max_lags_to_test = 6  # 6 months is a standard maximum for monthly financial data
+best_aic = float('inf')
+best_bic = float('inf')
+optimal_lag_aic = 0
+optimal_lag_bic = 0
+
+# Loop through lag 1 to max_lags_to_test
+for lag in range(1, max_lags_to_test + 1):
+    # Fit an Autoregressive model for the current number of lags
+    # old_names=False is just to suppress a statsmodels warning
+    ar_model = AutoReg(Y, lags=lag, old_names=False).fit()
+    
+    aic_score = ar_model.aic
+    bic_score = ar_model.bic
+    
+    print(f"AR({lag}) Model -> AIC: {aic_score:.4f} | BIC: {bic_score:.4f}")
+    
+    # Track the lowest AIC
+    if aic_score < best_aic:
+        best_aic = aic_score
+        optimal_lag_aic = lag
+        
+    # Track the lowest BIC
+    if bic_score < best_bic:
+        best_bic = bic_score
+        optimal_lag_bic = lag
+
+print("\n--- RESULTS ---")
+print(f"Optimal Lags according to AIC: {optimal_lag_aic}")
+print(f"Optimal Lags according to BIC: {optimal_lag_bic}")
+
