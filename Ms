@@ -97,3 +97,76 @@ X_final = X_raw.drop(columns=insignificant_vars)
 print("\n=== FINAL VARIABLES READY FOR MARKOV SWITCHING ===")
 print("Target (Y):", Y.name)
 print("Features (X):", X_final.columns.tolist())
+
+
+
+
+import matplotlib.pyplot as plt
+
+# ==========================================
+# STEP 3: MARKOV SWITCHING MODEL SETUP
+# ==========================================
+print("\n--- STEP 3: ESTIMATING THE MS-ARX MODEL ---")
+
+# Note: If switching_trend=True, statsmodels automatically handles the constant.
+# We must drop the 'const' column from X_final to avoid a "matrix rank" mathematical error.
+if 'const' in X_final.columns:
+    X_ms = X_final.drop(columns=['const'])
+else:
+    X_ms = X_final
+
+# Build the model
+# k_regimes=2: Testing for two distinct market states
+# switching_variance=True: Critical for IV; allows the error band to widen in a crisis
+# switching_trend=True: Allows the baseline mean to shift
+# switching_exog=False: Keeps macro variable impacts fixed initially for mathematical stability
+ms_model = sm.tsa.MarkovRegression(
+    endog=Y,
+    k_regimes=2,
+    exog=X_ms,
+    switching_trend=True,
+    switching_variance=True,
+    switching_exog=False 
+)
+
+# Fit the model
+# search_reps=20 forces the model to try 20 different random starting points.
+# This heavily prevents the dreaded "Hessian Inversion" convergence failure.
+print("Fitting the Markov Switching model. This requires Maximum Likelihood Estimation and may take a moment...")
+ms_results = ms_model.fit(search_reps=20)
+
+print("\n=== MARKOV SWITCHING MODEL SUMMARY ===")
+print(ms_results.summary())
+
+# ==========================================
+# STEP 4: VISUALIZING THE REGIMES
+# ==========================================
+print("\n--- STEP 4: PLOTTING SMOOTHED REGIME PROBABILITIES ---")
+
+
+
+# Create a two-panel plot
+fig, axes = plt.subplots(2, 1, figsize=(14, 8), sharex=True)
+
+# Top Panel: Plot the actual stationary target variable
+axes[0].plot(Y.index, Y, color='black', linewidth=1.5, label='Actual Volatility Changes (Y)')
+axes[0].axhline(0, color='grey', linestyle='--', alpha=0.5)
+axes[0].set_title('Stationary Target Variable (First Difference of Log IV)', fontsize=12)
+axes[0].legend(loc='upper left')
+axes[0].grid(True, alpha=0.2)
+
+# Bottom Panel: Plot the smoothed probability of being in Regime 1
+# Note: Regime 1 is typically the "high variance" regime, but verify this in your summary output
+prob_regime_1 = ms_results.smoothed_marginal_probabilities[1]
+
+axes[1].plot(prob_regime_1.index, prob_regime_1, color='red', linewidth=1.5, label='Probability of Regime 1')
+axes[1].fill_between(prob_regime_1.index, 0, prob_regime_1, color='red', alpha=0.3)
+axes[1].axhline(0.5, color='black', linestyle=':', label='50% Threshold')
+axes[1].set_title('Smoothed Probability of Being in Regime 1', fontsize=12)
+axes[1].set_ylabel('Probability')
+axes[1].legend(loc='upper left')
+axes[1].grid(True, alpha=0.2)
+
+plt.tight_layout()
+plt.show()
+
