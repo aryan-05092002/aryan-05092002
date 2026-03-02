@@ -94,3 +94,135 @@ def process_reer_hamilton(excel_file, sheet_name=0, reer_col_pattern='REER'):
 
 print("Hamilton filter code ready. Replace 'bruegel_reer.xlsx' with your file path.")
 
+
+
+
+
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings("ignore") # MS models can throw convergence warnings in loops
+
+# ==========================================
+# 1. EXTRACT THE ERROR CORRECTION TERM (ECT)
+# ==========================================
+print("--- 1. PREPARING TRADABLE MS-ECM DATA ---")
+
+target_var = 'Log_Implied_Vol'
+long_run_vars = ['Log_Realized_Vol', 'Log_Brent', 'Log_DXY'] # Update with your exact variables
+
+# Extract long-run betas from your previously fitted full DOLS model
+beta_coeffs = dols_full_model.params[['const'] + long_run_vars]
+
+# Calculate actual equilibrium and subtract it to get ECT
+equilibrium_IV = beta_coeffs['const'] + \
+                 (beta_coeffs['Log_Realized_Vol'] * dols_data['Log_Realized_Vol']) + \
+                 (beta_coeffs['Log_Brent'] * dols_data['Log_Brent']) + \
+                 (beta_coeffs['Log_DXY'] * dols_data['Log_DXY'])
+
+dols_data['ECT'] = dols_data[target_var] - equilibrium_IV
+
+# ==========================================
+# 2. CREATE THE STRICTLY TRADABLE (t-1) DATAFRAME
+# ==========================================
+ms_data = pd.DataFrame(index=dols_data.index)
+
+# Target Variable (Y): The CHANGE in Implied Volatility for Month T
+ms_data['Delta_IV_t'] = dols_data[target_var].diff()
+
+# Feature 1: The Bungee Cord (ECT from Month T-1)
+ms_data['ECT_t_1'] = dols_data['ECT'].shift(1)
+
+# Features 2+: The Short-Term Macro Shocks (Changes from Month T-1)
+ms_data['Delta_RV_t_1'] = dols_data['Log_Realized_Vol'].diff().shift(1)
+ms_data['Delta_Brent_t_1'] = dols_data['Log_Brent'].diff().shift(1)
+ms_data['Delta_DXY_t_1'] = dols_data['Log_DXY'].diff().shift(1)
+
+# Drop all NaNs created by differencing and shifting
+ms_data = ms_data.dropna()
+
+print(f"Data ready. Total tradable months available: {len(ms_data)}")
+
+# ==========================================
+# 3. FIT THE FULL IN-SAMPLE MS-ECM (To see the Regimes)
+# ==========================================
+print("\n--- 2. FITTING FULL IN-SAMPLE MS-ECM ---")
+Y_full = ms_data['Delta_IV_t']
+X_full = ms_data.drop(columns=['Delta_IV_t'])
+
+# Fit a 2-Regime model (0 = Calm, 1 = Crisis/High Vol)
+# trend='c' means the intercept switches. switching_variance=True means volatility switches.
+ms_model = sm.tsa.MarkovRegression(Y_full, k_regimes=2, exog=X_full, trend='c', switching_variance=True)
+ms_results = ms_model.fit(iter=100)
+
+print(ms_results.summary())
+
+# Plot the Smoothed Probabilities of being in the "Crisis" Regime
+fig, ax = plt.subplots(figsize=(14, 4))
+ax.plot(ms_results.smoothed_marginal_probabilities[1], color='red')
+ax.set_title('Probability of Market being in Regime 1 (High Volatility/Crisis State)')
+ax.set_ylabel('Probability')
+plt.show()
+
+# ==========================================
+# 4. RECURSIVE FORECAST FOR TRADABLE HIT RATE
+# ==========================================
+print("\n--- 3. CALCULATING PREDICTIVE TRADABLE HIT RATE ---")
+initial_train_size = 132  # 11 years
+total_obs = len(ms_data)
+
+actual_directions = []
+predicted_directions = []
+test_dates = []
+
+for train_end in range(initial_train_size, total_obs):
+    train_data = ms_data.iloc[:train_end]
+    test_data = ms_data.iloc[train_end:train_end+1]
+    
+    Y_train = train_data['Delta_IV_t']
+    X_train = train_data.drop(columns=['Delta_IV_t'])
+    
+    Y_test = test_data['Delta_IV_t']
+    X_test = test_data.drop(columns=['Delta_IV_t'])
+    
+    try:
+        # Fit model on expanding window
+        model = sm.tsa.MarkovRegression(Y_train, k_regimes=2, exog=X_train, trend='c', switching_variance=True)
+        # Disp=False hides the optimization text for every loop
+        res = model.fit(disp=False, iter=50) 
+        
+        # Predict the next step
+        # Markov models return the expected value across both regimes weighted by their transition probabilities
+        pred = res.predict(start=len(Y_train), end=len(Y_train), exog=X_test)
+        
+        # Because we are predicting the DIFFERENCE (Delta Y), the math is incredibly simple:
+        # If predicted Delta > 0, model bets UP (1). If < 0, model bets DOWN (-1).
+        pred_direction = np.sign(pred.values[0])
+        actual_direction = np.sign(Y_test.values[0])
+        
+        predicted_directions.append(pred_direction)
+        actual_directions.append(actual_direction)
+        test_dates.append(test_data.index[0])
+        
+    except Exception as e:
+        # Markov Switching models use Maximum Likelihood Estimation (MLE). 
+        # Very rarely, in a specific window, it might fail to converge. We skip that month if so.
+        pass
+
+# ==========================================
+# 5. FINAL RESULTS
+# ==========================================
+hit_df = pd.DataFrame({
+    'Actual_Dir': actual_directions,
+    'Pred_Dir': predicted_directions
+}, index=test_dates)
+
+hit_df['Correct'] = (hit_df['Actual_Dir'] == hit_df['Pred_Dir'])
+tradable_hit_rate = hit_df['Correct'].mean() * 100
+
+print("=== FINAL TRADABLE HIT RATE (MS-ECM) ===")
+print(f"Total Out-of-Sample Months Traded: {len(hit_df)}")
+print(f"Winning Trades (Correct Direction): {hit_df['Correct'].sum()}")
+print(f"Predictive Hit Rate: {tradable_hit_rate:.2f}%")
