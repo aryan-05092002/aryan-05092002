@@ -266,3 +266,41 @@ if f"Delta_{original_target_name}" in stationary_data.columns:
 
 print(f"\nTarget variable mapped to: {stationary_target_name}")
 
+
+
+
+
+
+Here are the final, combined methodological descriptions. I have taken the highly detailed, academic justifications from the second version and seamlessly integrated the clearer, more direct mathematical equations from the first version.
+This creates the perfect balance for a committee defense: deep econometric reasoning paired with highly readable, explicit formulas.
+1. Autoregressive Distributed Lag (ARDL) Dynamic Framework
+Conceptual and Econometric Justification
+The Autoregressive Distributed Lag (ARDL) framework is deployed to model the complex, time-varying transmission mechanisms of the South African economy. Standard macro-econometric models often impose restrictive assumptions, forcing all exogenous shocks to impact GDP instantaneously or with uniform delays. The ARDL framework relaxes this constraint, allowing each specific macroeconomic indicator to transmit through the economy at its own unique empirical speed. Furthermore, the ARDL structure inherently addresses potential endogeneity issues and provides highly robust estimates even in small, finite samples—a critical advantage when dealing with quarterly GDP data.
+Mathematical Framework
+The model integrates two distinct memory components: the Autoregressive (AR) structure, which models GDP based on its own historical trajectory, and the Distributed Lag (DL) structure, which models the delayed impact of exogenous indicators (e.g., interest rates, retail sales). The general ARDL (p, q) model can be expressed as:
+Where:
+ * Y_t is the target variable (Real GDP YoY Growth) at quarter t.
+ * Y_{t-i} represents the autoregressive lags up to order p.
+ * X_{j, t-l} represents the exogenous macroeconomic indicators with lags up to order q_j.
+ * \alpha_i and \beta_{j,l} are the coefficients to be estimated.
+ * \epsilon_t is a white-noise error term.
+Dynamic Optimization via Information Criteria
+To avoid overfitting and the "curse of dimensionality," our methodology does not assume a static lag structure across the forecasting horizon. Instead, at every rolling quarter, the model dynamically searches the parameter space to identify the optimal lag lengths (p and q_j) using the Bayesian Information Criterion (BIC). The BIC heavily penalizes model complexity:
+By minimizing the BIC at each step, the model ensures parsimony. It mathematically guarantees that a deeper lag (memory) is only retained if it significantly improves the out-of-sample predictive power, thereby preventing the model from capturing spurious historical noise.
+2. Mixed Data Sampling with LASSO Regularization (LASSO-MIDAS)
+Conceptual and Econometric Justification
+The fundamental bottleneck in macroeconomic nowcasting is the "ragged edge" problem combined with frequency mismatch. Quarterly GDP is released with a significant lag, whereas leading indicators (PMI, vehicle sales, money supply) are published at varying high frequencies (monthly or weekly). Traditional OLS models require aggregating this high-frequency data into quarterly averages, fundamentally destroying critical intra-quarter timing signals. The Mixed Data Sampling (MIDAS) framework bridges this gap by mapping high-frequency predictors directly onto a low-frequency target, while the LASSO penalty acts as an algorithmic filter to ruthlessly eliminate uninformative noise.
+Mathematical Framework & LASSO Integration
+To prevent parameter proliferation—a common issue when introducing multiple high-frequency lags—this framework introduces two layers of regularization. First, it employs a parameterized weighting function (an exponential decay polynomial) to enforce the economic intuition that recent shocks impact the economy more severely than older shocks. Second, it applies an L_1 penalty (LASSO) to handle highly correlated macroeconomic indicators (multicollinearity) and select only the most robust signals.
+The LASSO-MIDAS specification can be defined as:
+Where:
+ * Y_t is the quarterly GDP.
+ * X_{j, t-d/m} represents the j-th high-frequency indicator at the d-th high-frequency lag fraction m.
+ * w(d; \theta) is the decay weighting function that strictly parameterizes how an economic shock dissipates over time.
+ * \lambda is the penalty parameter, optimized via cross-validation, which shrinks the coefficients (\beta_j) of irrelevant high-frequency signals exactly to zero.
+Algorithmic Tuning and Real-Time Nowcasting
+The tuning parameter \lambda dictates the severity of the penalty. In our methodology, \lambda is dynamically optimized using k-fold Cross-Validation (CV) at every rolling window to find the exact floor of the out-of-sample forecasting error. As \lambda increases, the algorithm forces the coefficients of weaker, noisy indicators exactly to zero, performing simultaneous variable selection and regularization.
+The resulting LASSO-MIDAS architecture provides a highly reactive nowcasting engine. It continuously ingests asynchronous monthly data releases, filters out the macroeconomic noise, and updates the quarterly GDP prediction in real-time, providing policymakers with an accurate, high-fidelity signal well ahead of official statistical publications.
+This gives you the absolute best of both worlds.
+Would you like me to move forward and write the Python code for your final Master Consensus "Spaghetti" Plot, combining the final outputs of ARDL, DFM, LASSO, and your Indicator model?
+
